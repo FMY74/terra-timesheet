@@ -38,12 +38,12 @@ Illustrative **sample** rates — the calculation engine is the point, not the n
 
 | When | Rate (AUD/h) |
 |---|---|
-| Mon–Fri, to 18:00 | $30.00 |
-| Mon–Fri, after 18:00 | $36.00 |
-| Saturday | $36.00 |
-| Sunday, before 09:00 | $54.00 |
-| Sunday, from 09:00 | $42.00 |
-| Public holiday | $60.00 |
+| Mon–Fri, to 18:00 | $45.00 |
+| Mon–Fri, after 18:00 | $54.00 |
+| Saturday | $54.00 |
+| Sunday, before 09:00 | $81.00 |
+| Sunday, from 09:00 | $63.00 |
+| Public holiday | $90.00 |
 | Unpaid break | 30 min / shift |
 | Tax estimate | 18.6% |
 
