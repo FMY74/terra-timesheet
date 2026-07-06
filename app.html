@@ -250,7 +250,7 @@
     .shift-main .mid{ min-width:0; }
     .shift-main .mid .times{ font-family:var(--mono); font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .shift-main .mid .meta{ font-family:var(--mono); font-size:.72rem; color:var(--muted); margin-top:.3rem; display:flex; align-items:center; gap:.45rem; flex-wrap:wrap; }
-    .shift-main .pay{ text-align:right; }
+    .shift-main .pay{ text-align:right; display:flex; flex-direction:column; align-items:flex-end; }
     .shift-main .pay .amt{ font-family:var(--mono); font-size:1.05rem; font-weight:700; }
     .shift-main .pay .net{ font-family:var(--mono); font-size:.72rem; color:var(--muted); margin-top:.25rem; }
     .badge{ display:inline-flex; align-items:center; font-family:var(--mono); font-size:.62rem; font-weight:600; letter-spacing:.06em;
@@ -715,7 +715,14 @@
   /* ====================================================================
      STATE + PERSISTENCE (fail-closed).
      ==================================================================== */
-  const todayStr = dateToInput(new Date());
+  let todayStr = dateToInput(new Date());
+  /* Keep "today" honest when the page survives past midnight (home-screen web
+     apps stay alive for days): re-check on refocus and on the simulator tick. */
+  function refreshToday(){
+    const t = dateToInput(new Date());
+    if (t !== todayStr) { todayStr = t; renderAll(); }
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshToday(); });
 
   function freshState(){
     return {
@@ -726,7 +733,10 @@
     };
   }
 
-  function num(v, def, min, max){ const n = Number(v); return (Number.isFinite(n) && n >= min && n <= max) ? n : def; }
+  function num(v, def, min, max){
+    if (v == null || (typeof v === 'string' && v.trim() === '')) return def;  /* empty field → keep default, never silent 0 */
+    const n = Number(v); return (Number.isFinite(n) && n >= min && n <= max) ? n : def;
+  }
 
   function sanitizeShift(o){
     if (!o || typeof o !== 'object') return null;
@@ -737,16 +747,16 @@
     return { id, date: o.date, start: o.start, end: o.end, phMode };  /* reversed times kept, flagged at compute */
   }
 
-  function sanitizeSettings(s){
-    const def = freshState().settings;
+  function sanitizeSettings(s, base){
+    const def = base || freshState().settings;
     if (!s || typeof s !== 'object') return def;
     const rates = {};
     RATE_KEYS.forEach(k => rates[k] = num(s.rates && s.rates[k], def.rates[k], 0, 100000));
     return {
       taxRate: num(s.taxRate, def.taxRate, 0, 100),
       rates,
-      weeklyGoal: num(s.weeklyGoal, 0, 0, 1e9),
-      monthlyGoal: num(s.monthlyGoal, 0, 0, 1e9)
+      weeklyGoal: num(s.weeklyGoal, def.weeklyGoal, 0, 1e9),
+      monthlyGoal: num(s.monthlyGoal, def.monthlyGoal, 0, 1e9)
     };
   }
 
@@ -756,7 +766,9 @@
     st.settings = sanitizeSettings(saved.settings);
     const ui = saved.ui || {};
     st.ui.tab = ['day','week','month','year'].includes(ui.tab) ? ui.tab : 'day';
-    st.ui.selectedDate = isDateStr(ui.selectedDate) ? ui.selectedDate : todayStr;
+    /* Always open on today: restoring yesterday's selected date makes the Add
+       form silently target the wrong day on the next morning's first use. */
+    st.ui.selectedDate = todayStr;
     return st;
   }
 
@@ -1077,6 +1089,8 @@
   let flashId = null;
 
   function addShift(){
+    const btn = $('addBtn'), label = $('addBtnLabel');
+    if (btn.classList.contains('done')) return;   /* debounce double-taps during the ✓ morph */
     const s = sanitizeShift({ id: genId(), date: state.ui.selectedDate, start: draft.start, end: draft.end, phMode: draft.phMode });
     if (!s) { showSnack('Enter a valid date and times', null); return; }
     state.shifts.push(s);
@@ -1084,11 +1098,11 @@
     saveState();
     renderAll();
     /* button morph feedback */
-    const btn = $('addBtn'), label = $('addBtnLabel');
     btn.classList.add('done'); label.textContent = '✓ Added';
     setTimeout(() => { btn.classList.remove('done'); label.textContent = 'Add Shift'; }, 1200);
     const d = inputToDate(s.date);
-    showSnack(`${DAY_SHORT[d.getDay()]}, ${MON_SHORT[d.getMonth()]} ${d.getDate()} shift added`, null);
+    const warn = computeShift(s).invalid ? ' — check times' : '';
+    showSnack(`${DAY_SHORT[d.getDay()]}, ${MON_SHORT[d.getMonth()]} ${d.getDate()} shift added${warn}`, null);
   }
 
   function openEdit(id){
@@ -1186,6 +1200,13 @@
 
   function attachSwipe(li, card, id){
     let x0 = 0, y0 = 0, dx = 0, axis = null, active = false, pid = null;
+    /* Suppress only the click that immediately follows a horizontal drag.
+       (A one-shot capture blocker would stay armed after touch drags — where
+       no click fires — and silently eat the NEXT legitimate tap.) */
+    let suppressUntil = 0;
+    card.addEventListener('click', e => {
+      if (performance.now() < suppressUntil) { e.stopPropagation(); e.preventDefault(); suppressUntil = 0; }
+    }, true);
 
     function start(cx, cy, pointerId){ x0 = cx; y0 = cy; dx = 0; axis = null; active = true; pid = pointerId; }
     function move(cx, cy, ev){
@@ -1217,7 +1238,7 @@
       li.classList.remove('swiping');
       if (wasX && -dx > w * THRESH) { animateDelete(li, card, id); }
       else { card.style.transform = ''; li.classList.remove('will-delete'); }
-      if (wasX) card.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); }, { capture: true, once: true });
+      if (wasX) suppressUntil = performance.now() + 500;
       active = false; axis = null;
     }
 
@@ -1310,7 +1331,7 @@
         base: $('setBase').value, after18: $('setAfter18').value, sat: $('setSat').value,
         sun9: $('setSun9').value, sun: $('setSun').value, ph: $('setPh').value
       }
-    });
+    }, state.settings);  /* blank fields fall back to the CURRENT values, not factory defaults */
     state.settings = cand;
     saveState();
     renderAll();
@@ -1355,12 +1376,14 @@
   const CSV_HEADER = ['Date','Day','Clock In','Clock Out','Break (min)','Hours','Gross','Tax','Net'];
 
   function exportCsv(){
-    const rows = [CSV_HEADER.map(csvQuote).join(',')];
+    /* 10th column "PH" preserves the public-holiday override on round-trip;
+       import also accepts 9-column files from the reference app (PH → auto). */
+    const rows = [[...CSV_HEADER, 'PH'].map(csvQuote).join(',')];
     const sorted = state.shifts.slice().sort((a,b) => (a.date + a.start).localeCompare(b.date + b.start));
     for (const s of sorted) {
       const c = computeShift(s);
       const d = inputToDate(s.date);
-      rows.push([s.date, DAY_LONG[d.getDay()], s.start, s.end, 30, c.hours.toFixed(2), c.gross.toFixed(2), c.tax.toFixed(2), c.net.toFixed(2)]
+      rows.push([s.date, DAY_LONG[d.getDay()], s.start, s.end, 30, c.hours.toFixed(2), c.gross.toFixed(2), c.tax.toFixed(2), c.net.toFixed(2), s.phMode]
         .map(csvQuote).join(','));
     }
     return download(rows.join('\r\n'), `terra-timesheet-shifts-${todayStr}.csv`, 'text/csv');
@@ -1405,6 +1428,7 @@
     }
     /* Validate every row into candidates BEFORE touching existing data. */
     const candidates = [];
+    const phCol = header[expected.length] === 'ph' ? expected.length : -1;  /* optional 10th column */
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
       const date = (r[0] || '').trim();
@@ -1413,7 +1437,9 @@
       if (!isDateStr(date)) throw new Error(`Row ${i+1}: bad date "${date}".`);
       if (!ci || !co) throw new Error(`Row ${i+1}: bad clock in/out time.`);
       if (brk !== '' && Number(brk) !== 30) throw new Error(`Row ${i+1}: break must be 30 or blank.`);
-      candidates.push({ date, start: ci, end: co });
+      const rawPh = phCol >= 0 ? String(r[phCol] || '').trim().toLowerCase() : 'auto';
+      const phMode = ['auto','yes','no'].includes(rawPh) ? rawPh : 'auto';
+      candidates.push({ date, start: ci, end: co, phMode });
     }
     /* Skip duplicates (same date+start+end already present). */
     const existing = new Set(state.shifts.map(s => s.date + '|' + s.start + '|' + s.end));
@@ -1422,7 +1448,7 @@
       const key = c.date + '|' + c.start + '|' + c.end;
       if (existing.has(key)) { skipped++; continue; }
       existing.add(key);
-      state.shifts.push({ id: genId(), date: c.date, start: c.start, end: c.end, phMode: 'auto' });
+      state.shifts.push({ id: genId(), date: c.date, start: c.start, end: c.end, phMode: c.phMode });
       imported++;
     }
     saveState();
@@ -1454,7 +1480,10 @@
     const sb = $('snackbar'), undo = $('undoBtn');
     $('snackMsg').textContent = msg;
     undoFn = fn;
-    if (fn) { undo.hidden = false; undo.tabIndex = 0; } else { undo.hidden = true; undo.tabIndex = -1; }
+    if (fn) {
+      undo.hidden = false; undo.tabIndex = 0;
+      setTimeout(() => undo.focus(), 60);   /* keyboard path to Undo after a delete */
+    } else { undo.hidden = true; undo.tabIndex = -1; }
     sb.classList.add('show');
     clearTimeout(undoTimer);
     undoTimer = setTimeout(hideSnack, fn ? 6000 : 3000);
@@ -1570,7 +1599,7 @@
   bindUI();
   renderAll();
   /* simulator recomputes every minute while visible */
-  setInterval(renderSimulator, 60000);
+  setInterval(() => { refreshToday(); renderSimulator(); }, 60000);
 
   window.__tt = { computeShift, splitBuckets, state, RATE_KEYS, save: saveState, load: loadState };
   </script>

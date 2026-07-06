@@ -47,6 +47,11 @@ state = {
 }
 ```
 
+- On startup the app always opens on **today** (the persisted `selectedDate` is not restored):
+  restoring yesterday's date would make the Add form silently target the wrong day on the next
+  morning's first use. "Today" is also re-derived when the page regains visibility and on the
+  simulator's minute tick, so a home-screen web app that survives past midnight stays correct.
+
 - Multiple shifts per day are allowed (Duplicate exists). IDs are `crypto.randomUUID()`.
 - Validation: `isDateStr` (regex + round-trip), `isTimeStr` (00:00–23:59), start<end else the shift
   is stored but flagged "Check times" and computes $0/0h (overnight not supported, same as v1).
@@ -119,11 +124,13 @@ Layout order (one scrolling column, max-width ~560px centred on desktop):
 
 ## CSV formats
 
-- **Export** (same columns as the reference app):
-  `"Date","Day","Clock In","Clock Out","Break (min)","Hours","Gross","Tax","Net"` — one row per
-  shift, chronological, quoted, filename `terra-timesheet-shifts-YYYY-MM-DD.csv`.
-- **Import**: accepts exactly that header (quoted or not). Uses Date/Clock In/Clock Out only
-  (engine recomputes pay); Break must be 30 or blank; malformed file → reject whole file with a
+- **Export** (reference-app columns plus a trailing `PH` column so the public-holiday override
+  survives a round-trip):
+  `"Date","Day","Clock In","Clock Out","Break (min)","Hours","Gross","Tax","Net","PH"` — one row
+  per shift, chronological, quoted, filename `terra-timesheet-shifts-YYYY-MM-DD.csv`.
+- **Import**: accepts that header with or without the trailing `PH` column (the reference app's
+  9-column export imports as `PH=auto`). Uses Date/Clock In/Clock Out (+PH when present) — the
+  engine recomputes pay; Break must be 30 or blank; malformed file → reject whole file with a
   clear message, existing data untouched. Duplicate rows (same date+start+end as an existing
   shift) are skipped; summary snackbar "N imported, M skipped".
 
