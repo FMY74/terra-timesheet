@@ -62,11 +62,13 @@ state = {
   [mid−15min, mid+15min] from the paid window, then split the remaining minutes into buckets.
   (An equally valid "deduct from cheapest bucket" rule is indistinguishable on all real data;
   centre-of-shift is the documented choice.)
-- Per shift: `gross = round2(Σ bucketHours × rate)`, `tax = round2(gross × taxRate)`,
-  `net = round2(gross − tax)`.
-- Per period (day/week/month/year): `gross = Σ per-shift rounded gross`,
-  `tax = round2(periodGross × taxRate)`, `net = round2(periodGross × (1 − taxRate))`
-  (independent rounding — matches the reference app's observed behaviour).
+- Per shift: keep the **raw (unrounded)** gross `raw = Σ bucketHours × rate` internally;
+  display `gross = round2(raw)`, `tax = round2(raw × taxRate)`, `net = round2(raw × (1 − taxRate))`
+  — tax and net are each rounded **independently from raw**, never derived from the rounded gross
+  (so `gross − tax` may differ from `net` by a cent; that is correct and matches the reference app).
+- Per period (day/week/month/year): `rawSum = Σ per-shift raw gross`; `gross = round2(rawSum)`,
+  `tax = round2(rawSum × taxRate)`, `net = round2(rawSum × (1 − taxRate))`. Never sum the rounded
+  per-shift values (verified: rounded-sum drifts cents off the reference app's period cards).
 - Weeks start Monday. All dates local-time (no UTC parsing).
 
 ## Screens (single page, 4 tabs)
