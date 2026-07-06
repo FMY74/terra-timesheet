@@ -127,10 +127,13 @@
     .earn .big .aud{ font-family:var(--mono); font-size:.36em; color:var(--muted); font-weight:600; margin-left:.3em; letter-spacing:0; }
     .earn .sub{ font-family:var(--mono); color:var(--muted); font-size:.85rem; margin-top:.65rem; letter-spacing:.01em; }
     .earn .divider{ height:1px; background:var(--line); margin:1.2rem 0 1.1rem; }
-    .earn .cols{ display:grid; grid-template-columns:repeat(3,1fr); gap:.7rem; }
+    /* Columns size to their content and spread across the row: rigid 1fr
+       thirds let long mono values (e.g. "-$1,133.75") paint over the next
+       column, since nowrap text ink-overflows its cell. */
+    .earn .cols{ display:grid; grid-template-columns:auto auto auto; justify-content:space-between; column-gap:.6rem; }
     .earn .col{ min-width:0; }
     .earn .col .k{ font-family:var(--sans); font-size:.72rem; font-weight:600; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); }
-    .earn .col .v{ font-family:var(--mono); font-size:clamp(1.02rem, 4.6vw, 1.3rem); font-weight:700; margin-top:.42rem; letter-spacing:-.02em; white-space:nowrap; }
+    .earn .col .v{ font-family:var(--mono); font-size:clamp(.95rem, 4.3vw, 1.3rem); font-weight:700; margin-top:.42rem; letter-spacing:-.02em; white-space:nowrap; }
     .earn .col.net .v{ color:var(--mint); }
     .earn .col.tax .v{ color:var(--red); }
     /* goal progress */
@@ -322,7 +325,8 @@
        RESPONSIVE / MOTION
        ================================================================== */
     @media (max-width:400px){
-      .earn .col .v{ font-size:1.15rem; }
+      /* (no .earn .col .v override here — a fixed size defeats the vw clamp
+         and reintroduces column overlap on narrow phones) */
       .clocktile .ctime{ font-size:1.6rem; }
     }
     @media (prefers-reduced-motion: reduce){
