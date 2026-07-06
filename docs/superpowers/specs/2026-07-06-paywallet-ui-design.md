@@ -68,13 +68,47 @@ state = {
   (An equally valid "deduct from cheapest bucket" rule is indistinguishable on all real data;
   centre-of-shift is the documented choice.)
 - Per shift: keep the **raw (unrounded)** gross `raw = Σ bucketHours × rate` internally;
-  display `gross = round2(raw)`, `tax = round2(raw × taxRate)`, `net = round2(raw × (1 − taxRate))`
-  — tax and net are each rounded **independently from raw**, never derived from the rounded gross
-  (so `gross − tax` may differ from `net` by a cent; that is correct and matches the reference app).
-- Per period (day/week/month/year): `rawSum = Σ per-shift raw gross`; `gross = round2(rawSum)`,
+  display `gross = round2(raw)`.
+- Weeks start Monday. All dates local-time (no UTC parsing).
+
+### Tax (two modes; `settings.taxMode`, default `auto`)
+
+**Manual mode** (`taxMode:'manual'`, percent in `settings.taxRate`) — the original flat-estimate
+behaviour, kept for parity with the reference app and for non-AU users:
+- Per shift: `tax = round2(raw × taxRate)`, `net = round2(raw × (1 − taxRate))` — each rounded
+  independently from raw, never derived from the rounded gross (so `gross − tax` may differ from
+  `net` by a cent; that is correct and matches the reference app).
+- Per period: `rawSum = Σ per-shift raw gross`; `gross = round2(rawSum)`,
   `tax = round2(rawSum × taxRate)`, `net = round2(rawSum × (1 − taxRate))`. Never sum the rounded
   per-shift values (verified: rounded-sum drifts cents off the reference app's period cards).
-- Weeks start Monday. All dates local-time (no UTC parsing).
+
+**Auto mode** (`taxMode:'auto'`) — ATO weekly PAYG withholding (Schedule 1 / NAT 1004,
+Scale 2 = resident, tax-free threshold claimed, no STSL), computed per pay week:
+- Pay week = Mon–Sun. `weekRaw = Σ raw gross` of the week's shifts.
+- `x = floor(weekRaw) + 0.99`; find the first bracket with `x < limit`; `y = a·x − b`;
+  `weekTax = round to nearest dollar (.50 rounds up)`; below the first threshold → $0.
+- **Era selection**: the schedule that applies is the one in force on the *payment* date, observed
+  to be week-end (Sunday) + 2 days for this employer. Week end + 2 ≥ 2026-07-01 → the 2026-27
+  coefficients (ATO, published 17 Jun 2026); earlier weeks → the from-1-July-2024 coefficients
+  (NAT 1004). Coefficient tables live in one clearly-marked constant; **yearly maintenance**:
+  add the new FY's coefficients each July (tracked in vault alongside the VIC holiday list).
+- 2026-27 Scale 2 brackets (x < limit → a, b): 362 → 0/0 · 538 → .1500/54.3462 ·
+  673 → .2500/108.2135 · 721 → .1700/54.3473 · 865 → .1790/60.8377 · 1282 → .3227/185.1935 ·
+  2596 → .3200/181.7319 · 3653 → .3900/363.4627 · ∞ → .4700/655.7704.
+  From-1-July-2024 Scale 2: 361 → 0/0 · 500 → .1600/57.8462 · 625 → .2600/107.8462 ·
+  721 → .1800/57.8462 · 865 → .1890/64.3365 · 1282 → .3227/180.0385 · 2596 → .3200/176.5769 ·
+  3653 → .3900/358.3077 · ∞ → .4700/650.6154.
+- **Allocation**: per-shift tax = `weekTax × shiftRaw / weekRaw` (unrounded internally; rounded
+  only for display/CSV). Period tax = `round2(Σ allocated tax of the period's shifts)`;
+  period net = `round2(rawSum − Σ allocated)`. The Week card's tax therefore equals the ATO
+  weekly amount exactly (whole dollars); months/years sum their shifts' allocations even when
+  pay weeks straddle the boundary.
+- **Simulator** in auto mode uses the marginal amount:
+  `payg(weekRaw + simRaw) − payg(weekRaw)` for the current week.
+- Worked example (2026-27 era): weekly gross $1,000.00 → x = 1000.99 →
+  y = 0.3227 × 1000.99 − 185.1935 = $137.83 → withhold **$138**.
+  (Also validated locally against a real payslip to the exact dollar; real figures stay out of
+  this repo.)
 
 ## Screens (single page, 4 tabs)
 
@@ -117,7 +151,8 @@ Layout order (one scrolling column, max-width ~560px centred on desktop):
     secondary buttons **Duplicate** / **Cancel** / **Delete** (red outline). Save/duplicate/delete all
     close the sheet, flash the affected row, and show a snackbar (delete's has Undo).
 11. **Settings sheet**: "Adjust your goals and preferences." rows — Weekly Goal ($, 0=off),
-    Monthly Goal, Tax Rate (%, default 18.6), then **Pay rates ($/h)**: base / after-18:00 /
+    Monthly Goal, **Tax row: mode segmented Auto (ATO weekly) / Manual %** (percent input, default
+    18.6, editable only in Manual; in Auto it is dimmed/ignored), then **Pay rates ($/h)**: base / after-18:00 /
     Saturday / Sunday before 9 / Sunday / Public holiday (defaults above); gradient **Save
     Settings**; row **Export CSV** / **Close**; **Import CSV** + **Backup JSON** / **Restore JSON**
     (fail-closed) as quiet secondary actions; red-outline **Delete All Data** (typed/2-step confirm).
