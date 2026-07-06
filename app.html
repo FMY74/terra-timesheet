@@ -300,6 +300,8 @@
     .setrow input{ width:130px; flex:none; text-align:right; background:var(--tile); border:1px solid var(--line); border-radius:12px;
       min-height:48px; padding:0 .9rem; font-family:var(--mono); font-size:1rem; color:var(--text); }
     .setrow input:focus{ outline:none; border-color:var(--mint); box-shadow:0 0 0 3px rgba(52,211,153,.15); }
+    .setrow.dim{ opacity:.5; }                 /* Tax Rate row when Auto (ATO) mode is active */
+    .setrow input:disabled{ cursor:not-allowed; }
     .setgroup-label{ font-family:var(--sans); font-size:.74rem; font-weight:600; letter-spacing:.13em; text-transform:uppercase;
       color:var(--muted); margin:1.5rem 0 .2rem; }
     .quiet-actions{ display:grid; grid-template-columns:repeat(2,1fr); gap:.6rem; margin-top:1rem; }
@@ -535,7 +537,14 @@
       <input type="number" inputmode="numeric" id="setMonthly" min="0" step="1" aria-label="Monthly goal in dollars" />
     </div>
     <div class="setrow">
-      <div class="sk"><div class="t">Tax Rate</div><div class="d">Default 18.6%</div></div>
+      <div class="sk"><div class="t">Tax</div><div class="d">ATO weekly withholding or a flat %</div></div>
+      <div class="seg" id="setTaxSeg" role="group" aria-label="Tax mode">
+        <button type="button" data-taxmode="auto" aria-pressed="true">Auto</button>
+        <button type="button" data-taxmode="manual" aria-pressed="false">Manual %</button>
+      </div>
+    </div>
+    <div class="setrow" id="taxRateRow">
+      <div class="sk"><div class="t">Tax Rate</div><div class="d">Used in Manual mode</div></div>
       <input type="number" inputmode="decimal" id="setTax" min="0" max="100" step="0.1" aria-label="Tax rate percent" />
     </div>
 
@@ -697,26 +706,157 @@
   }
 
   /* computeShift → { hours, raw, gross, tax, net, invalid }. `raw` is the
-     unrounded gross; gross/tax/net are EACH rounded independently from raw
-     (never tax-from-rounded-gross, never net = gross − tax — they may
-     legitimately differ by 1¢; matches the reference app). */
+     unrounded gross; gross is round2(raw).
+     MANUAL tax mode: tax/net are EACH rounded independently from raw (never
+     tax-from-rounded-gross, never net = gross − tax — they may legitimately
+     differ by 1¢; matches the reference app).
+     AUTO tax mode: tax is this shift's share of the ATO weekly PAYG
+     withholding for its pay week (see allocatedTax); net = round2(raw − share). */
   function computeShift(shift){
     const { buckets, paidMinutes, invalid } = splitBuckets(shift);
     const rates = state.settings.rates;
     let raw = 0;
     for (const k of RATE_KEYS) raw += buckets[k] * rates[k];
-    const tr = state.settings.taxRate / 100;
-    return { hours: paidMinutes / 60, raw, gross: round2(raw),
-             tax: round2(raw * tr), net: round2(raw * (1 - tr)), invalid };
+    let tax, net;
+    if (state.settings.taxMode === 'manual') {
+      const tr = state.settings.taxRate / 100;          /* flat % — bit-identical to v1 */
+      tax = round2(raw * tr); net = round2(raw * (1 - tr));
+    } else {
+      const alloc = allocatedTax(shift, raw);           /* ATO weekly PAYG share for this shift */
+      tax = round2(alloc); net = round2(raw - alloc);
+    }
+    return { hours: paidMinutes / 60, raw, gross: round2(raw), tax, net, invalid };
   }
 
-  /* Period aggregation: sum the RAW per-shift grosses, then round gross/tax/net
-     each once from that raw sum (never sum the rounded per-shift values). */
+  /* Period aggregation.
+     MANUAL: sum the RAW per-shift grosses, then round gross/tax/net each once
+     from that raw sum (never sum the rounded per-shift values).
+     AUTO: gross from the raw sum; tax = round2(Σ per-shift PAYG allocations);
+     net = round2(rawSum − Σ allocations). A single pay week's card therefore
+     shows the exact ATO whole-dollar weekly amount; months/years sum their
+     shifts' allocations even across pay-week boundaries. */
   function periodSummary(shifts){
-    let raw = 0, hours = 0;
-    for (const s of shifts) { const c = computeShift(s); raw += c.raw; hours += c.hours; }
-    const tr = state.settings.taxRate / 100;
-    return { gross: round2(raw), tax: round2(raw * tr), net: round2(raw * (1 - tr)), hours };
+    let raw = 0, hours = 0, alloc = 0;
+    const manual = state.settings.taxMode === 'manual';
+    for (const s of shifts) {
+      const c = computeShift(s);
+      raw += c.raw; hours += c.hours;
+      if (!manual) alloc += allocatedTax(s, c.raw);
+    }
+    if (manual) {
+      const tr = state.settings.taxRate / 100;
+      return { gross: round2(raw), tax: round2(raw * tr), net: round2(raw * (1 - tr)), hours };
+    }
+    return { gross: round2(raw), tax: round2(alloc), net: round2(raw - alloc), hours };
+  }
+
+  /* ====================================================================
+     ATO PAYG WEEKLY WITHHOLDING  —  auto tax mode
+     --------------------------------------------------------------------
+     Source: Australian Taxation Office, Schedule 1 — Statement of formulas
+     for calculating amounts to be withheld (NAT 1004), coefficients for
+     "Scale 2" = Australian resident who HAS claimed the tax-free threshold,
+     with NO Study/Training Support Loan (STSL). Weekly earnings.
+       • 2026-27 coefficients: ATO schedule published 17 Jun 2026.
+       • from-1-July-2024 coefficients: NAT 1004 (in force 2024-25 onward).
+     YEARLY MAINTENANCE: each July, add the new financial year's coefficient
+     row-set below and extend paygEra() (tracked in the vault alongside the
+     VIC public-holiday list). These coefficients (and the $1,000 → $138
+     worked example) are the ONLY pay figures in this file — no real personal
+     pay data lives here.
+
+     Method (per ATO): x = whole dollars of weekly gross + 0.99; find the
+     first row whose upper `limit` exceeds x; withhold y = a·x − b, rounded to
+     the nearest dollar (exactly 50c rounds up). Earnings below the first
+     limit withhold nil.
+       Worked example (2026-27): weekly gross $1,000.00 → x = 1000.99 →
+       y = 0.3227 × 1000.99 − 185.1935 = 137.83 → withhold $138.
+     ==================================================================== */
+  const PAYG_SCALE2 = {
+    '2026-27': [   /* published 17 Jun 2026 */
+      { limit: 362,      a: 0,      b: 0 },
+      { limit: 538,      a: 0.1500, b: 54.3462 },
+      { limit: 673,      a: 0.2500, b: 108.2135 },
+      { limit: 721,      a: 0.1700, b: 54.3473 },
+      { limit: 865,      a: 0.1790, b: 60.8377 },
+      { limit: 1282,     a: 0.3227, b: 185.1935 },
+      { limit: 2596,     a: 0.3200, b: 181.7319 },
+      { limit: 3653,     a: 0.3900, b: 363.4627 },
+      { limit: Infinity, a: 0.4700, b: 655.7704 }
+    ],
+    '2024-07': [   /* from 1 July 2024 (NAT 1004) */
+      { limit: 361,      a: 0,      b: 0 },
+      { limit: 500,      a: 0.1600, b: 57.8462 },
+      { limit: 625,      a: 0.2600, b: 107.8462 },
+      { limit: 721,      a: 0.1800, b: 57.8462 },
+      { limit: 865,      a: 0.1890, b: 64.3365 },
+      { limit: 1282,     a: 0.3227, b: 180.0385 },
+      { limit: 2596,     a: 0.3200, b: 176.5769 },
+      { limit: 3653,     a: 0.3900, b: 358.3077 },
+      { limit: Infinity, a: 0.4700, b: 650.6154 }
+    ]
+  };
+
+  /* The schedule in force on the PAYMENT date (observed to be week-end + 2
+     days for this employer): week-end + 2 ≥ 2026-07-01 → 2026-27, else 2024-07. */
+  function paygEra(weekEndStr){
+    const d = inputToDate(weekEndStr); d.setDate(d.getDate() + 2);
+    return dateToInput(d) >= '2026-07-01' ? '2026-27' : '2024-07';
+  }
+  /* Weekly PAYG withholding for `weeklyRaw` gross, using the era of `weekEndStr`. */
+  function payg(weeklyRaw, weekEndStr){
+    if (!(weeklyRaw > 0)) return 0;                       /* ≤ $0 (or NaN) → nil */
+    const table = PAYG_SCALE2[paygEra(weekEndStr)];
+    const x = Math.floor(weeklyRaw) + 0.99;
+    let row = table[table.length - 1];
+    for (const r of table) { if (x < r.limit) { row = r; break; } }
+    return Math.max(0, Math.round(row.a * x - row.b));    /* nearest dollar, exactly 50c up */
+  }
+
+  /* Sunday (pay-week end) for the week containing `dateStr`. */
+  function weekEndOf(dateStr){
+    const d = inputToDate(mondayOf(dateStr)); d.setDate(d.getDate() + 6);
+    return dateToInput(d);
+  }
+  /* Unrounded raw gross of one shift (same order/ops as computeShift's raw). */
+  function rawGrossOf(shift){
+    const { buckets } = splitBuckets(shift);
+    const rates = state.settings.rates;
+    let raw = 0;
+    for (const k of RATE_KEYS) raw += buckets[k] * rates[k];
+    return raw;
+  }
+  /* Σ raw gross of the pay week containing `dateStr` (auto-mode simulator). */
+  function weekRawFor(dateStr){
+    const r = periodRange('week', dateStr);
+    let raw = 0;
+    for (const s of shiftsInRange(r.start, r.end)) raw += rawGrossOf(s);
+    return raw;
+  }
+
+  /* Auto-mode per-shift tax allocation, cached and rebuilt lazily. Group the
+     current shifts by pay week; weekTax = payg(weekRaw, weekEnd); each shift's
+     tax = weekTax × shiftRaw / weekRaw (UNROUNDED here — rounded only for
+     display/CSV). Invalidated on every saveState() (i.e. every mutation). */
+  let autoTaxCache = null;   /* Map<shiftId, allocatedTaxUnrounded> | null */
+  function buildTaxCache(){
+    autoTaxCache = new Map();
+    const weeks = new Map();   /* mondayStr → { raw, end, items:[{id,raw}] } */
+    for (const s of state.shifts) {
+      const raw = rawGrossOf(s), mon = mondayOf(s.date);
+      let w = weeks.get(mon);
+      if (!w) { w = { raw: 0, end: weekEndOf(s.date), items: [] }; weeks.set(mon, w); }
+      w.raw += raw; w.items.push({ id: s.id, raw });
+    }
+    for (const w of weeks.values()) {
+      const weekTax = payg(w.raw, w.end);
+      for (const it of w.items) autoTaxCache.set(it.id, w.raw > 0 ? weekTax * it.raw / w.raw : 0);
+    }
+  }
+  function allocatedTax(shift, raw){
+    if (autoTaxCache === null) buildTaxCache();
+    if (shift && autoTaxCache.has(shift.id)) return autoTaxCache.get(shift.id);
+    return payg(raw, weekEndOf(shift.date));   /* lone-week fallback: shift not in state (test hooks) */
   }
 
   /* ====================================================================
@@ -735,7 +875,7 @@
     return {
       version: 2,
       shifts: [],
-      settings: { taxRate: 18.6, rates: { base:45, after18:54, sat:54, sun9:81, sun:63, ph:90 }, weeklyGoal: 0, monthlyGoal: 0 },
+      settings: { taxMode: 'auto', taxRate: 18.6, rates: { base:45, after18:54, sat:54, sun9:81, sun:63, ph:90 }, weeklyGoal: 0, monthlyGoal: 0 },
       ui: { tab: 'day', selectedDate: todayStr }
     };
   }
@@ -760,6 +900,7 @@
     const rates = {};
     RATE_KEYS.forEach(k => rates[k] = num(s.rates && s.rates[k], def.rates[k], 0, 100000));
     return {
+      taxMode: (s.taxMode === 'manual' || s.taxMode === 'auto') ? s.taxMode : 'auto',  /* missing/invalid → auto */
       taxRate: num(s.taxRate, def.taxRate, 0, 100),
       rates,
       weeklyGoal: num(s.weeklyGoal, def.weeklyGoal, 0, 1e9),
@@ -809,6 +950,7 @@
   }
 
   function saveState(){
+    autoTaxCache = null;   /* shifts/settings changed → PAYG allocations rebuild lazily on next compute */
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(_){}
   }
 
@@ -981,9 +1123,18 @@
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     const dur = simHours;
-    const gross = round2(simGross(nowMin, dur * 60, todayStr));
-    const tr = state.settings.taxRate / 100;
-    const net = round2(gross * (1 - tr));
+    const rawGross = simGross(nowMin, dur * 60, todayStr);
+    const gross = round2(rawGross);
+    let net;
+    if (state.settings.taxMode === 'manual') {
+      const tr = state.settings.taxRate / 100;
+      net = round2(gross * (1 - tr));
+    } else {
+      /* marginal ATO withholding on top of what's already earned this pay week */
+      const weekEnd = weekEndOf(todayStr), curWeekRaw = weekRawFor(todayStr);
+      const marginal = payg(curWeekRaw + rawGross, weekEnd) - payg(curWeekRaw, weekEnd);
+      net = round2(gross - marginal);
+    }
     const blended = dur > 0 ? gross / dur : 0;
     const hh = String(now.getHours()).padStart(2,'0'), mm = String(now.getMinutes()).padStart(2,'0');
     $('simFrom').textContent = `From ${hh}:${mm} · ${dur}h`;
@@ -1069,8 +1220,9 @@
   }
 
   function setUnlessFocused(id, value){ const el = $(id); if (document.activeElement !== el) el.value = value; }
-  function syncSeg(segId, value){
-    for (const b of $(segId).querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.ph === value));
+  function syncSeg(segId, value, attr){
+    attr = attr || 'ph';
+    for (const b of $(segId).querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset[attr] === value));
   }
 
   /* ====================================================================
@@ -1357,11 +1509,20 @@
   /* ====================================================================
      SETTINGS
      ==================================================================== */
+  let taxDraft = state.settings.taxMode;   /* segmented Tax mode while the Settings sheet is open */
+  function updateTaxUI(){
+    const manual = taxDraft === 'manual';
+    $('setTax').disabled = !manual;                       /* % input only meaningful in Manual */
+    $('taxRateRow').classList.toggle('dim', !manual);
+  }
   function openSettings(){
     const s = state.settings;
     $('setWeekly').value = s.weeklyGoal;
     $('setMonthly').value = s.monthlyGoal;
     $('setTax').value = s.taxRate;
+    taxDraft = s.taxMode;
+    syncSeg('setTaxSeg', taxDraft, 'taxmode');
+    updateTaxUI();
     $('setBase').value = s.rates.base;
     $('setAfter18').value = s.rates.after18;
     $('setSat').value = s.rates.sat;
@@ -1373,7 +1534,8 @@
   }
   function saveSettings(){
     const cand = sanitizeSettings({
-      weeklyGoal: $('setWeekly').value, monthlyGoal: $('setMonthly').value, taxRate: $('setTax').value,
+      weeklyGoal: $('setWeekly').value, monthlyGoal: $('setMonthly').value,
+      taxMode: taxDraft, taxRate: $('setTax').value,
       rates: {
         base: $('setBase').value, after18: $('setAfter18').value, sat: $('setSat').value,
         sun9: $('setSun9').value, sun: $('setSun').value, ph: $('setPh').value
@@ -1548,12 +1710,13 @@
   /* ====================================================================
      EVENT WIRING
      ==================================================================== */
-  function bindSeg(segId, onPick){
+  function bindSeg(segId, onPick, attr){
+    attr = attr || 'ph';
     $(segId).addEventListener('click', e => {
-      const b = e.target.closest('button[data-ph]');
+      const b = e.target.closest('button[data-' + attr + ']');
       if (!b) return;
-      syncSeg(segId, b.dataset.ph);
-      onPick(b.dataset.ph);
+      syncSeg(segId, b.dataset[attr], attr);
+      onPick(b.dataset[attr]);
     });
   }
 
@@ -1617,6 +1780,7 @@
 
     /* settings */
     $('gearBtn').addEventListener('click', openSettings);
+    bindSeg('setTaxSeg', mode => { taxDraft = mode; updateTaxUI(); }, 'taxmode');
     $('saveSettingsBtn').addEventListener('click', saveSettings);
     $('closeSettingsBtn').addEventListener('click', () => closeSheet());
     $('exportCsvBtn').addEventListener('click', exportCsv);
@@ -1648,7 +1812,7 @@
   /* simulator recomputes every minute while visible */
   setInterval(() => { refreshToday(); renderSimulator(); }, 60000);
 
-  window.__tt = { computeShift, splitBuckets, state, RATE_KEYS, save: saveState, load: loadState };
+  window.__tt = { computeShift, splitBuckets, payg, state, RATE_KEYS, save: saveState, load: loadState };
   </script>
 </body>
 </html>
