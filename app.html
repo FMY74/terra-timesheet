@@ -312,6 +312,19 @@
       border:1px solid rgba(248,113,113,.34); color:var(--red); font-size:1rem; font-weight:600; transition:background .15s; }
     .btn-danger-wide:hover{ background:rgba(248,113,113,.13); }
 
+    /* rate-era selector (segmented pills, one per effective-dated rate set) */
+    .eraseg{ display:flex; flex-wrap:wrap; gap:3px; background:var(--tile); border:1px solid var(--line);
+      border-radius:12px; padding:3px; margin:.55rem 0 .2rem; }
+    .eraseg button{ flex:1 1 auto; min-height:44px; padding:0 .85rem; border-radius:10px; font-size:.82rem; font-weight:500;
+      color:var(--muted); white-space:nowrap; transition:color .15s, background .15s; }
+    .eraseg button[aria-pressed="true"]{ background:var(--card-2); color:var(--text); border:1px solid var(--line-2); font-weight:600; }
+    .setrow[hidden]{ display:none; }   /* author display:flex would otherwise defeat [hidden] */
+    #eraFromRow input{ width:170px; }
+    .era-actions{ display:flex; gap:.6rem; margin-top:.9rem; }
+    .era-actions .btn-quiet{ flex:1; margin:0; }
+    .era-actions .btn-quiet.danger{ color:var(--red); border-color:rgba(248,113,113,.32); }
+    .era-actions .btn-quiet.danger:hover{ color:var(--red); background:rgba(248,113,113,.10); border-color:rgba(248,113,113,.5); }
+
     /* ==================================================================
        SNACKBAR
        ================================================================== */
@@ -549,12 +562,21 @@
     </div>
 
     <div class="setgroup-label">Pay rates ($/h)</div>
+    <div class="eraseg" id="eraSeg" role="group" aria-label="Rate era"></div>
+    <div class="setrow" id="eraFromRow" hidden>
+      <div class="sk"><div class="t">Effective from</div><div class="d">First full pay period on/after the rise</div></div>
+      <input type="date" id="eraFrom" aria-label="Rate era effective-from date" />
+    </div>
     <div class="setrow"><div class="sk"><div class="t">Weekday base</div><div class="d">To 18:00</div></div><input type="number" inputmode="decimal" id="setBase" min="0" step="0.5" aria-label="Weekday base rate" /></div>
     <div class="setrow"><div class="sk"><div class="t">Weekday after 18:00</div></div><input type="number" inputmode="decimal" id="setAfter18" min="0" step="0.5" aria-label="Weekday after 18:00 rate" /></div>
     <div class="setrow"><div class="sk"><div class="t">Saturday</div></div><input type="number" inputmode="decimal" id="setSat" min="0" step="0.5" aria-label="Saturday rate" /></div>
     <div class="setrow"><div class="sk"><div class="t">Sunday before 9</div></div><input type="number" inputmode="decimal" id="setSun9" min="0" step="0.5" aria-label="Sunday before 9:00 rate" /></div>
     <div class="setrow"><div class="sk"><div class="t">Sunday</div></div><input type="number" inputmode="decimal" id="setSun" min="0" step="0.5" aria-label="Sunday rate" /></div>
     <div class="setrow"><div class="sk"><div class="t">Public holiday</div></div><input type="number" inputmode="decimal" id="setPh" min="0" step="0.5" aria-label="Public holiday rate" /></div>
+    <div class="era-actions">
+      <button class="btn-quiet" id="addEraBtn" type="button">+ Add rate change</button>
+      <button class="btn-quiet danger" id="removeEraBtn" type="button" hidden>Remove</button>
+    </div>
 
     <button class="btn-primary" id="saveSettingsBtn" type="button" style="margin-top:1.4rem;">Save Settings</button>
 
@@ -590,6 +612,7 @@
   const STORAGE_KEY = 'terra-timesheet-v2';
   const V1_KEY = 'terra-timesheet-v1';
   const RATE_KEYS = ['base','after18','sat','sun9','sun','ph'];
+  const FACTORY_RATES = { base:45, after18:54, sat:54, sun9:81, sun:63, ph:90 };  /* neutral sample defaults */
   const $ = id => document.getElementById(id);
 
   const DAY_LONG = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -652,6 +675,9 @@
   /* Human display: "9:00", "17:00" (24h, no leading zero on hour). */
   function fmtTime(t){ const [h,m] = t.split(':').map(Number); return `${h}:${String(m).padStart(2,'0')}`; }
   function fmtDateLong(str){ const d = inputToDate(str); return `${MON_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`; }
+  /* "29 Jun 2026" — compact form used on the rate-era pills. */
+  function fmtDayMon(str){ const d = inputToDate(str); return `${d.getDate()} ${MON_SHORT[d.getMonth()]} ${d.getFullYear()}`; }
+  function dayBefore(str){ const d = inputToDate(str); d.setDate(d.getDate() - 1); return dateToInput(d); }
 
   /* ====================================================================
      PAY ENGINE (exact per spec §Pay engine).
@@ -667,6 +693,23 @@
     if (shift.phMode === 'no') return false;
     return isVicPublicHoliday(shift.date);
   }
+
+  /* Effective-dated pay rates ("rate eras"). settings.rateEras is sorted by
+     `from` (first era's from is null = "since the beginning"). eraFor returns
+     the last era whose from is null or ≤ dateStr, plus its index (for grouping
+     the breakdown by era). ratesFor is the rate set that applied on a date. */
+  function eraFor(dateStr){
+    const eras = (state.settings.rateEras && state.settings.rateEras.length)
+      ? state.settings.rateEras : [{ from: null, rates: FACTORY_RATES }];
+    let era = eras[0], index = 0;
+    for (let i = 0; i < eras.length; i++) {
+      const e = eras[i];
+      if (e.from == null || e.from <= dateStr) { era = e; index = i; }
+      else break;   /* sorted ascending → no later era can qualify */
+    }
+    return { era, index };
+  }
+  function ratesFor(dateStr){ return eraFor(dateStr).era.rates; }
 
   /* splitBuckets → { buckets:{base,after18,sat,sun9,sun,ph} in HOURS, paidMinutes, invalid } */
   function splitBuckets(shift){
@@ -714,7 +757,7 @@
      withholding for its pay week (see allocatedTax); net = round2(raw − share). */
   function computeShift(shift){
     const { buckets, paidMinutes, invalid } = splitBuckets(shift);
-    const rates = state.settings.rates;
+    const rates = ratesFor(shift.date);                 /* rates in force on the shift's date */
     let raw = 0;
     for (const k of RATE_KEYS) raw += buckets[k] * rates[k];
     let tax, net;
@@ -821,7 +864,7 @@
   /* Unrounded raw gross of one shift (same order/ops as computeShift's raw). */
   function rawGrossOf(shift){
     const { buckets } = splitBuckets(shift);
-    const rates = state.settings.rates;
+    const rates = ratesFor(shift.date);                 /* era-aware, same as computeShift */
     let raw = 0;
     for (const k of RATE_KEYS) raw += buckets[k] * rates[k];
     return raw;
@@ -875,7 +918,7 @@
     return {
       version: 2,
       shifts: [],
-      settings: { taxMode: 'auto', taxRate: 18.6, rates: { base:45, after18:54, sat:54, sun9:81, sun:63, ph:90 }, weeklyGoal: 0, monthlyGoal: 0 },
+      settings: { taxMode: 'auto', taxRate: 18.6, rateEras: [{ from: null, rates: { ...FACTORY_RATES } }], weeklyGoal: 0, monthlyGoal: 0 },
       ui: { tab: 'day', selectedDate: todayStr }
     };
   }
@@ -894,15 +937,56 @@
     return { id, date: o.date, start: o.start, end: o.end, phMode };  /* reversed times kept, flagged at compute */
   }
 
+  /* Sanitize one era's six rates. Each blank/invalid field falls back to the
+     previous era's already-sanitized value, else the factory default — never a
+     silent 0. */
+  function eraRatesSanitized(rawRates, prevRates){
+    const fb = prevRates || FACTORY_RATES;
+    const src = (rawRates && typeof rawRates === 'object') ? rawRates : {};
+    const rates = {};
+    RATE_KEYS.forEach(k => rates[k] = num(src[k], fb[k], 0, 100000));
+    return rates;
+  }
+  /* Sanitize a rateEras array (fail-closed): validate each era's from + rates
+     (rate fallback = previous era's values), sort by from (null first), dedupe
+     duplicate `from` keeping the last, and force the earliest era's from to null
+     so every date resolves. Missing/empty → a single factory era. */
+  function sanitizeRateEras(input){
+    const arr = Array.isArray(input) ? input : null;
+    if (!arr || arr.length === 0) return [{ from: null, rates: { ...FACTORY_RATES } }];
+    const cleaned = [];
+    let prev = null;
+    for (const e of arr) {                                 /* validate in input order */
+      if (!e || typeof e !== 'object') continue;
+      const from = isDateStr(e.from) ? e.from : null;
+      const rates = eraRatesSanitized(e.rates, prev);
+      cleaned.push({ from, rates });
+      prev = rates;
+    }
+    if (cleaned.length === 0) return [{ from: null, rates: { ...FACTORY_RATES } }];
+    const byFrom = (a, b) => {                              /* null sorts before any date */
+      if (a.from == null) return b.from == null ? 0 : -1;
+      if (b.from == null) return 1;
+      return a.from < b.from ? -1 : a.from > b.from ? 1 : 0;
+    };
+    cleaned.sort(byFrom);
+    const dedup = new Map();                                /* duplicate from → keep the last */
+    for (const e of cleaned) dedup.set(e.from, e);
+    const out = Array.from(dedup.values()).sort(byFrom);
+    out[0].from = null;                                     /* earliest era always covers earlier dates */
+    return out;
+  }
+
   function sanitizeSettings(s, base){
     const def = base || freshState().settings;
     if (!s || typeof s !== 'object') return def;
-    const rates = {};
-    RATE_KEYS.forEach(k => rates[k] = num(s.rates && s.rates[k], def.rates[k], 0, 100000));
     return {
       taxMode: (s.taxMode === 'manual' || s.taxMode === 'auto') ? s.taxMode : 'auto',  /* missing/invalid → auto */
       taxRate: num(s.taxRate, def.taxRate, 0, 100),
-      rates,
+      rateEras: sanitizeRateEras(
+        Array.isArray(s.rateEras) ? s.rateEras
+          : (s.rates && typeof s.rates === 'object') ? [{ from: null, rates: s.rates }]  /* legacy flat rates → one era */
+          : null),
       weeklyGoal: num(s.weeklyGoal, def.weeklyGoal, 0, 1e9),
       monthlyGoal: num(s.monthlyGoal, def.monthlyGoal, 0, 1e9)
     };
@@ -1157,7 +1241,7 @@
   }
   function segmentGross(s, e, dayObj){
     if (e <= s) return 0;
-    const r = state.settings.rates;
+    const r = ratesFor(dateToInput(dayObj));            /* simulator uses the era in force that day */
     const ph = isVicPublicHoliday(dateToInput(dayObj));
     const dow = dayObj.getDay();
     if (ph) return (e - s) / 60 * r.ph;
@@ -1168,16 +1252,31 @@
 
   function renderBreakdown(){
     const shifts = currentPeriodShifts();
-    const totals = { base:0, after18:0, sat:0, sun9:0, sun:0, ph:0 };
-    for (const s of shifts) { const b = splitBuckets(s).buckets; RATE_KEYS.forEach(k => totals[k] += b[k]); }
     const meta = {
       base:'Weekday base', after18:'Weekday after 18:00', sat:'Saturday',
       sun9:'Sunday before 9:00', sun:'Sunday', ph:'Public holiday'
     };
-    const rows = RATE_KEYS.filter(k => totals[k] > 0.0001).map(k => {
-      const hrs = totals[k], g = round2(hrs * state.settings.rates[k]);
-      return `<div class="brow"><div class="bk">${meta[k]}<small>${hrs.toFixed(2)} h · ${money(state.settings.rates[k])}/h</small></div><div class="bv">${money(g)}</div></div>`;
-    });
+    /* Group by (bucket, rate) so a period spanning a rate change shows one row
+       per rate. `order` = earliest era index contributing (for stable ordering). */
+    const groups = new Map();
+    for (const s of shifts) {
+      const b = splitBuckets(s).buckets;
+      const { era, index } = eraFor(s.date);
+      for (const k of RATE_KEYS) {
+        if (b[k] <= 0.0001) continue;
+        const rate = era.rates[k], key = k + '|' + rate;
+        let g = groups.get(key);
+        if (!g) { g = { bucket: k, rate, hours: 0, order: index }; groups.set(key, g); }
+        g.hours += b[k];
+        if (index < g.order) g.order = index;
+      }
+    }
+    const rows = Array.from(groups.values())
+      .sort((a, b) => (RATE_KEYS.indexOf(a.bucket) - RATE_KEYS.indexOf(b.bucket)) || (a.order - b.order) || (a.rate - b.rate))
+      .map(g => {
+        const amt = round2(g.hours * g.rate);
+        return `<div class="brow"><div class="bk">${meta[g.bucket]}<small>${g.hours.toFixed(2)} h · ${money(g.rate)}/h</small></div><div class="bv">${money(amt)}</div></div>`;
+      });
     $('breakdownCard').innerHTML = rows.length ? rows.join('') : '<div class="empty">No data for this period.</div>';
   }
 
@@ -1515,6 +1614,89 @@
     $('setTax').disabled = !manual;                       /* % input only meaningful in Manual */
     $('taxRateRow').classList.toggle('dim', !manual);
   }
+
+  /* ---- rate eras (Settings sheet draft) ----------------------------------
+     All edits live in `eraDraft` (a deep copy of state.settings.rateEras) and
+     persist only on Save. `eraSel` is the selected era's index. The six rate
+     inputs + the effective-from date are bound to the selected era. */
+  const RATE_INPUT_IDS = { base:'setBase', after18:'setAfter18', sat:'setSat', sun9:'setSun9', sun:'setSun', ph:'setPh' };
+  let eraDraft = [];
+  let eraSel = 0;
+  let removeEraArmed = false;
+
+  const eraByFrom = (a, b) => {                            /* null first, else ISO string compare */
+    if (a.from == null) return b.from == null ? 0 : -1;
+    if (b.from == null) return 1;
+    return a.from < b.from ? -1 : a.from > b.from ? 1 : 0;
+  };
+  function eraLabel(i){
+    if (i === 0) return eraDraft.length === 1 ? 'All time' : 'Until ' + fmtDayMon(dayBefore(eraDraft[1].from));
+    return 'From ' + fmtDayMon(eraDraft[i].from);
+  }
+  /* Read the live inputs into the selected era so edits survive a pill switch.
+     A blank rate field keeps the era's current value (same contract as the rest
+     of Settings — blank never means 0); only non-blank edits are captured. */
+  function captureEraInputs(){
+    const era = eraDraft[eraSel];
+    if (!era) return;
+    for (const k of RATE_KEYS) {
+      const v = $(RATE_INPUT_IDS[k]).value;
+      if (String(v).trim() !== '') era.rates[k] = v;   /* strings; sanitized on save */
+    }
+    if (eraSel > 0 && isDateStr($('eraFrom').value)) era.from = $('eraFrom').value;
+  }
+  function renderEraUI(){
+    removeEraArmed = false;
+    const seg = $('eraSeg');
+    seg.innerHTML = '';
+    eraDraft.forEach((e, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.eraIdx = String(i);
+      btn.setAttribute('aria-pressed', String(i === eraSel));
+      btn.textContent = eraLabel(i);
+      seg.appendChild(btn);
+    });
+    const era = eraDraft[eraSel];
+    for (const k of RATE_KEYS) $(RATE_INPUT_IDS[k]).value = era.rates[k];
+    const isFirst = eraSel === 0;
+    $('eraFromRow').hidden = isFirst;
+    if (!isFirst) $('eraFrom').value = era.from || '';
+    $('removeEraBtn').hidden = isFirst;
+    $('removeEraBtn').textContent = 'Remove';
+  }
+  function selectEra(i){ captureEraInputs(); eraSel = i; renderEraUI(); }
+  function addEra(){
+    captureEraInputs();
+    const latest = eraDraft[eraDraft.length - 1];         /* duplicate the latest era's values */
+    const added = { from: todayStr, rates: { ...latest.rates } };
+    eraDraft.push(added);
+    eraDraft.sort(eraByFrom);
+    eraSel = eraDraft.indexOf(added);
+    renderEraUI();
+  }
+  function removeEra(){
+    if (eraSel === 0) return;                              /* first era is not removable */
+    if (!removeEraArmed) {
+      removeEraArmed = true;
+      $('removeEraBtn').textContent = 'Tap to confirm';
+      setTimeout(() => { if (removeEraArmed) { removeEraArmed = false; $('removeEraBtn').textContent = 'Remove'; } }, 4000);
+      return;
+    }
+    eraDraft.splice(eraSel, 1);
+    eraSel = Math.min(eraSel, eraDraft.length - 1);
+    renderEraUI();
+  }
+  function changeEraFrom(){
+    if (eraSel === 0) return;
+    captureEraInputs();
+    const cur = eraDraft[eraSel];
+    if (isDateStr($('eraFrom').value)) cur.from = $('eraFrom').value;
+    eraDraft.sort(eraByFrom);                              /* editing the date re-sorts */
+    eraSel = eraDraft.indexOf(cur);
+    renderEraUI();
+  }
+
   function openSettings(){
     const s = state.settings;
     $('setWeekly').value = s.weeklyGoal;
@@ -1523,23 +1705,18 @@
     taxDraft = s.taxMode;
     syncSeg('setTaxSeg', taxDraft, 'taxmode');
     updateTaxUI();
-    $('setBase').value = s.rates.base;
-    $('setAfter18').value = s.rates.after18;
-    $('setSat').value = s.rates.sat;
-    $('setSun9').value = s.rates.sun9;
-    $('setSun').value = s.rates.sun;
-    $('setPh').value = s.rates.ph;
+    eraDraft = s.rateEras.map(e => ({ from: e.from, rates: { ...e.rates } }));   /* deep copy for editing */
+    eraSel = 0;
+    renderEraUI();
     deleteArmed = false; $('deleteAllBtn').textContent = 'Delete All Data';
     openSheet('settingsSheet');
   }
   function saveSettings(){
+    captureEraInputs();
     const cand = sanitizeSettings({
       weeklyGoal: $('setWeekly').value, monthlyGoal: $('setMonthly').value,
       taxMode: taxDraft, taxRate: $('setTax').value,
-      rates: {
-        base: $('setBase').value, after18: $('setAfter18').value, sat: $('setSat').value,
-        sun9: $('setSun9').value, sun: $('setSun').value, ph: $('setPh').value
-      }
+      rateEras: eraDraft
     }, state.settings);  /* blank fields fall back to the CURRENT values, not factory defaults */
     state.settings = cand;
     saveState();
@@ -1781,6 +1958,14 @@
     /* settings */
     $('gearBtn').addEventListener('click', openSettings);
     bindSeg('setTaxSeg', mode => { taxDraft = mode; updateTaxUI(); }, 'taxmode');
+    /* rate eras */
+    $('eraSeg').addEventListener('click', e => {
+      const b = e.target.closest('button[data-era-idx]');
+      if (b) selectEra(Number(b.dataset.eraIdx));
+    });
+    $('eraFrom').addEventListener('change', changeEraFrom);
+    $('addEraBtn').addEventListener('click', addEra);
+    $('removeEraBtn').addEventListener('click', removeEra);
     $('saveSettingsBtn').addEventListener('click', saveSettings);
     $('closeSettingsBtn').addEventListener('click', () => closeSheet());
     $('exportCsvBtn').addEventListener('click', exportCsv);
@@ -1812,7 +1997,7 @@
   /* simulator recomputes every minute while visible */
   setInterval(() => { refreshToday(); renderSimulator(); }, 60000);
 
-  window.__tt = { computeShift, splitBuckets, payg, state, RATE_KEYS, save: saveState, load: loadState };
+  window.__tt = { computeShift, splitBuckets, payg, ratesFor, state, RATE_KEYS, save: saveState, load: loadState };
   </script>
 </body>
 </html>
