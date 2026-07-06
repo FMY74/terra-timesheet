@@ -4,6 +4,11 @@ A single-file, offline-first **timesheet & pay calculator** styled as a crypto�
 
 Built as a focused front-end portfolio piece: **zero dependencies, zero build step, one HTML file.** Open it in any browser and it just works.
 
+## Live demo
+
+- **v1 (the app this README describes):** https://fmy74.github.io/terra-timesheet/
+- **v2 (`app.html`):** https://fmy74.github.io/terra-timesheet/app.html — a mobile-first rebuild (Day / Week / Month / Year) with automatic Australian tax withholding (ATO weekly scales), effective-dated pay-rate history and CSV / JSON backup. Rates are neutral samples; set your own in the in-app Settings.
+
 ![Week view — equity / PnL dashboard](screenshots/week-desktop.png)
 
 <p align="center">
