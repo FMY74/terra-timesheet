@@ -71,6 +71,27 @@ state = {
   display `gross = round2(raw)`.
 - Weeks start Monday. All dates local-time (no UTC parsing).
 
+### Rate eras (effective-dated pay rates)
+
+Award rates change (typically the first full pay period on/after 1 July). Historical shifts must
+keep computing at the rates that applied on their date:
+
+- `settings.rateEras = [ { from: null, rates: {base, after18, sat, sun9, sun, ph} }, … ]` —
+  sorted by `from` (the first era's `from` is null = "since the beginning"; later eras start on
+  their `from` date, `YYYY-MM-DD`).
+- `ratesFor(dateStr)` = the last era whose `from` is null or ≤ dateStr. The engine, breakdown and
+  CSV rows use `ratesFor(shift.date)`; the simulator uses `ratesFor(today)`.
+- Period breakdown groups rows by (bucket, rate) so a period spanning a rate change shows one row
+  per rate (e.g. "Weekday base 12.0 h · $45.00/h" and "Weekday base 8.0 h · $47.00/h").
+- Legacy state/backups with a flat `settings.rates` sanitize to a single era
+  `[{from: null, rates}]`. Eras with an invalid `from` or invalid rates fall back per-field to the
+  previous era's values; duplicate `from` dates keep the last.
+- **Settings UI**: the PAY RATES section gains an era selector (segmented pills, e.g.
+  "Until 28 Jun 2026" / "From 29 Jun 2026"), an "effective from" date row for non-first eras,
+  the six rate fields editing the selected era, plus "+ Add rate change" (duplicates the latest
+  era's values, default `from` = today) and "Remove" on non-first eras. Save Settings persists
+  all eras at once.
+
 ### Tax (two modes; `settings.taxMode`, default `auto`)
 
 **Manual mode** (`taxMode:'manual'`, percent in `settings.taxRate`) — the original flat-estimate
