@@ -1,78 +1,75 @@
 # Terra Timesheet
 
-A single-file, offline-first **timesheet & pay calculator** styled as a crypto‑exchange trading terminal. Log your shifts, watch your "equity" (take‑home pay) update live, and swipe a shift left to delete it — with one‑tap undo.
+A single-file, offline-first **timesheet & pay calculator** for Australian shift work. Log a shift and it works out the penalty rates, the ATO tax withheld and what actually lands in your account — for the day, the week, the month and the year.
 
 Built as a focused front-end portfolio piece: **zero dependencies, zero build step, one HTML file.** Open it in any browser and it just works.
 
 ## Live demo
 
-- **v1 (the app this README describes):** https://fmy74.github.io/terra-timesheet/
-- **v2 (`app.html`):** https://fmy74.github.io/terra-timesheet/app.html — a mobile-first rebuild (Day / Week / Month / Year) with automatic Australian tax withholding (ATO weekly scales), effective-dated pay-rate history and CSV / JSON backup. Rates are neutral samples; set your own in the in-app Settings.
+**https://fmy74.github.io/terra-timesheet/** — mobile-first, so it looks best on a phone (or a narrow window). It opens empty: add a shift to see the engine run.
 
-![Week view — equity / PnL dashboard](screenshots/week-desktop.png)
+![Week view — earnings, tax and hours](screenshots/week-desktop.png)
 
 <p align="center">
-  <img src="screenshots/week-mobile.png" width="32%" alt="Week view on mobile" />
-  <img src="screenshots/swipe-delete.png" width="32%" alt="Swipe a shift left to delete" />
-  <img src="screenshots/entry-mobile.png" width="32%" alt="Log a shift" />
+  <img src="screenshots/day-mobile.png" width="32%" alt="Day view — add a shift" />
+  <img src="screenshots/month-mobile.png" width="32%" alt="Month view with a daily-earnings chart" />
+  <img src="screenshots/year-mobile.png" width="32%" alt="Year view" />
 </p>
 
-_Screenshots use fictional sample data — the name, dates, and pay figures shown are made up._
+<p align="center">
+  <img src="screenshots/settings-rates.png" width="32%" alt="Settings — pay rates split into effective-dated eras" />
+  <img src="screenshots/breakdown-mobile.png" width="32%" alt="Period breakdown, grouped by rate era" />
+</p>
+
+_Screenshots use fictional sample data — every rate, date and figure in them is made up._
 
 ## Highlights
 
-- **Swipe‑to‑delete with undo** — drag a shift card left (touch *or* mouse) to reveal a red *Delete* action; release past the threshold to remove it. A bottom snackbar offers **Undo** for a few seconds. A visible trash button is the keyboard/desktop equivalent, so the action is never gesture‑only.
-- **Real payroll engine** — calculates Australian (Victoria) **penalty rates**: weekday base / after‑18:00, Saturday, Sunday (before/after 09:00), and public‑holiday rates, with a 30‑minute unpaid break and an 18.6% tax estimate. Gross, tax, and net are derived per shift, rolled up per week, and summarised per month.
-- **Three views** — **Entry** (log a shift for any day), **Week** (an "equity / PnL" dashboard: take‑home figure, daily‑net sparkline, hours / gross / fees / days), and **Year** (monthly totals + highlights).
-- **Trading‑terminal design** — a warm, near‑black UI with a green PnL accent, a market‑stats ticker, monospace tabular numerals, and colour‑coded figures (net in green, fees/tax in red). Warm light and dark themes, both persisted.
-- **Offline & private** — your timesheet data lives only in `localStorage` on your device and is never transmitted; **Export / Import** are manual JSON backups. (The page loads its web fonts from Google Fonts; your timesheet data never leaves the browser.)
+- **Four views** — **Day**, **Week**, **Month** and **Year**, each showing gross, tax, net and hours for the period, plus a breakdown by rate and the shift history. Month adds a daily-earnings chart; Week and Month track progress against an optional goal.
+- **Penalty-rate engine** — splits a shift across weekday base / after‑18:00 / Saturday / Sunday (before and from 09:00) / public holiday, removes the unpaid break from the centre of the shift, and auto-detects Victorian public holidays.
+- **Automatic tax** — ATO **weekly PAYG withholding** (Scale 2, tax-free threshold claimed) computed per pay week and allocated back to each shift, so the net figure matches a real payslip. A flat manual % is available instead.
+- **Effective-dated pay rates** — a pay rise starts from a date: shifts before it keep the old rates, shifts after it use the new ones, and the breakdown lists each era separately. No retro-editing of past pay.
+- **Pay simulator** — "if I clock on now for 1 / 2 / 4 / 6 / 8 hours", with the *marginal* tax on those hours, not an average.
+- **Swipe‑to‑delete with undo** — drag a shift card left (touch or mouse) to delete; a snackbar offers **Undo**. A visible button does the same, so it is never gesture-only.
+- **Offline & private** — data lives only in `localStorage` on your device and is never transmitted. **CSV** and **JSON** export/import are manual backups.
 
 ## Engineering notes
 
 A few things that went beyond "make it look nice":
 
-- **Fail‑closed data import.** A backup file is fully validated into a fresh candidate object *before* it is committed; if anything is malformed the existing data is left untouched. Startup is hardened the same way, so a corrupt `localStorage` value can never brick the app.
-- **Safe undo.** Undo only restores a deleted shift if that day is still empty, so it can never silently overwrite a shift you re‑entered during the undo window.
-- **Honest validation.** A reversed or too‑short shift (clock‑off ≤ clock‑on) is flagged with a *Check times* warning instead of silently calculating $0.
-- **Accessibility.** Semantic roles/labels, a focusable skip link, keyboard‑reachable delete + undo (focus moves to the Undo button on delete), `prefers-reduced-motion` support, ≥44px tap targets, and WCAG‑checked contrast in both themes.
-- **60fps swipe** via Pointer Events (`touch-action: pan-y` so vertical scrolling is never hijacked), with axis locking and a rubber‑band past the threshold.
+- **Fail‑closed persistence.** Imports and saved state are fully validated into a fresh candidate object *before* they are committed; anything malformed is rejected and the existing data is left untouched, so a corrupt `localStorage` value can never brick the app.
+- **Rate eras that always resolve.** Eras are sorted, de‑duplicated and the earliest one is forced to cover all earlier dates — so every shift, however old, has exactly one rate set. Blank rate fields fall back to the previous era's value, never to a silent zero.
+- **Honest tax.** Withholding is a weekly, non-linear function, so it is computed on the whole pay week and split back across that week's shifts pro rata — kept unrounded internally and rounded only for display.
+- **Safe undo.** Undo restores a deleted shift only if nothing has taken its place, so it can never overwrite a shift you re‑entered during the undo window.
+- **Local-time dates everywhere** (never `new Date('YYYY-MM-DD')`), and "today" is re-checked when the page comes back into focus, so an app left open overnight doesn't log to yesterday.
+- **Accessibility.** Semantic roles/labels, focus management in the bottom sheets, keyboard-reachable delete + undo, `prefers-reduced-motion` support, ≥44px tap targets, WCAG-checked contrast.
 
-## Pay rules (Victoria‑AU style)
+## Pay rules
 
-Illustrative **sample** rates — the calculation engine is the point, not the numbers. Edit the `RATES` object to match your own award.
+The **calculation engine is the point, not the numbers** — no rates are baked into the code. Set your own in **Settings**: the six penalty rates, the unpaid break, your goals, and the date each pay rise takes effect.
 
-| When | Rate (AUD/h) |
-|---|---|
-| Mon–Fri, to 18:00 | $45.00 |
-| Mon–Fri, after 18:00 | $54.00 |
-| Saturday | $54.00 |
-| Sunday, before 09:00 | $81.00 |
-| Sunday, from 09:00 | $63.00 |
-| Public holiday | $90.00 |
-| Unpaid break | 30 min / shift |
-| Tax estimate | 18.6% |
+**Overnight shifts are not supported.** A shift that crosses midnight (clock‑off ≤ clock‑on) is flagged with a *Check times* warning rather than silently miscalculated — split it into two day entries.
 
-Public‑holiday auto‑detection covers **2025–2026** (Victoria). For other years, set the *Public holiday* mode manually per day.
-
-**Overnight shifts are not supported.** A shift that crosses midnight (clock‑off ≤ clock‑on) is treated as invalid and flagged with a *Check times* warning — split it into two day entries.
+**Yearly maintenance (each July):** add the new financial year's ATO withholding coefficients and the next year's Victorian public-holiday dates. Both are marked in the source.
 
 ## Run it
 
 ```text
-Open terra-timesheet.html in any modern browser.
+Open app.html in any modern browser.
 ```
 
-No install, no server, no build. To try swipe‑to‑delete: log a shift (Entry → *Use default times* → *Save entry*) for a couple of days, open **Week**, then drag a card left.
+No install, no server, no build. On a phone, "Add to Home Screen" gives it a full-screen app shell.
 
 ## Tech
 
-Vanilla HTML / CSS / JavaScript · `localStorage` · Pointer Events · inline SVG sparkline · web fonts (Archivo + JetBrains Mono). No frameworks, no dependencies, single file.
+Vanilla HTML / CSS / JavaScript · `localStorage` · Pointer Events · inline SVG chart · web fonts (Archivo + JetBrains Mono). No frameworks, no dependencies, single file.
 
 ## Project structure
 
 ```text
-terra-timesheet.html   # the entire app
-screenshots/           # README images
+app.html                # the entire app
+screenshots/            # README images
+docs/superpowers/specs/ # the design spec the UI was built from
 ```
 
 ## License
