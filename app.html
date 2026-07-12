@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-  <title>Terra Timesheet</title>
+  <title>Wagetrack</title>
   <meta name="color-scheme" content="dark" />
   <meta name="theme-color" content="#05070a" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Terra Timesheet" />
+  <meta name="apple-mobile-web-app-title" content="Wagetrack" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -358,7 +358,7 @@
     <header class="topbar">
       <div class="brand">
         <div class="mark" aria-hidden="true"><span>$</span></div>
-        <h1>Terra Timesheet</h1>
+        <h1>Wagetrack</h1>
       </div>
       <button class="gear" id="gearBtn" type="button" aria-label="Open settings" aria-haspopup="dialog">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -605,10 +605,12 @@
   <script>
   "use strict";
   /* ====================================================================
-     Terra Timesheet — offline-first timesheet & pay calculator.
+     Wagetrack — offline-first timesheet & pay calculator.
      Single file, vanilla JS. localStorage key `terra-timesheet-v2`.
      ==================================================================== */
 
+  /* Storage keys keep the old app name on purpose: renaming them would strand
+     every existing install's saved shifts. Never change these. */
   const STORAGE_KEY = 'terra-timesheet-v2';
   const V1_KEY = 'terra-timesheet-v1';
   const RATE_KEYS = ['base','after18','sat','sun9','sun','ph'];
@@ -1772,7 +1774,7 @@
       rows.push([s.date, DAY_LONG[d.getDay()], s.start, s.end, 30, c.hours.toFixed(2), c.gross.toFixed(2), c.tax.toFixed(2), c.net.toFixed(2), s.phMode]
         .map(csvQuote).join(','));
     }
-    return download(rows.join('\r\n'), `terra-timesheet-shifts-${todayStr}.csv`, 'text/csv');
+    return download(rows.join('\r\n'), `wagetrack-shifts-${todayStr}.csv`, 'text/csv');
   }
 
   /* Minimal RFC-4180-ish CSV parser (quotes, commas, CRLF/LF). */
@@ -1843,12 +1845,12 @@
   }
 
   function backupJson(){
-    return download(JSON.stringify(state, null, 2), `terra-timesheet-backup-${todayStr}.json`, 'application/json');
+    return download(JSON.stringify(state, null, 2), `wagetrack-backup-${todayStr}.json`, 'application/json');
   }
   function restoreJson(text){
     let parsed = null;
     try { parsed = JSON.parse(text); } catch(_) { throw new Error('Not valid JSON.'); }
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.shifts)) throw new Error('Not a Terra Timesheet backup.');
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.shifts)) throw new Error('Not a Wagetrack backup.');
     const cand = normalizeState(parsed);   /* full validation into a candidate first */
     state.shifts = cand.shifts;
     state.settings = cand.settings;

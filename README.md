@@ -1,4 +1,4 @@
-# Terra Timesheet
+# Wagetrack
 
 A single-file, offline-first **timesheet & pay calculator** for Australian shift work. Log a shift and it works out the penalty rates, the ATO tax withheld and what actually lands in your account — for the day, the week, the month and the year.
 
