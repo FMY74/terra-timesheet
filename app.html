@@ -199,6 +199,15 @@
     .btn-primary svg{ width:20px; height:20px; }
     .btn-primary.done{ background:linear-gradient(103deg,#2bbd88,#2f9f7a); }
 
+    /* Shift-entered card (replaces the Add Shift form when the selected day already has shifts) */
+    .form[hidden]{ display:none; }         /* author display:flex would otherwise defeat [hidden] */
+    .donecard{ padding:.3rem .55rem; }
+    .donecard .shift-main{ border-radius:12px; border-bottom:1px solid var(--line); }
+    .donecard .shift-main:hover{ background:var(--card-2); }
+    .donecard .addanother{ width:100%; min-height:50px; display:flex; align-items:center; justify-content:center;
+      gap:.4rem; color:var(--mint); font-weight:600; font-size:.92rem; }
+    .donecard .addanother:hover{ color:var(--mint-2); }
+
     /* ==================================================================
        PAY SIMULATOR
        ================================================================== */
@@ -415,9 +424,10 @@
         <div class="xaxis" id="chartAxis"></div>
       </section>
 
-      <!-- ADD SHIFT -->
-      <div class="label">Add Shift</div>
-      <section class="card form">
+      <!-- ADD SHIFT / SHIFT ENTERED -->
+      <div class="label" id="addLabel">Add Shift</div>
+      <section class="card donecard" id="doneCard" hidden></section>
+      <section class="card form" id="addCard">
         <div class="daterow">
           <div class="cal" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
           <div class="dtext"><div class="dow" id="addDow">MONDAY</div><div class="dval" id="addDval">—</div></div>
@@ -1195,6 +1205,13 @@
 
   function renderAddForm(){
     const sel = state.ui.selectedDate, d = inputToDate(sel);
+    /* Day already has shift(s) → swap the form for the entered-shift card (tap = edit). */
+    const dayShifts = state.shifts.filter(s => s.date === sel);
+    const done = dayShifts.length > 0 && !addAnother;
+    $('addLabel').textContent = done ? 'Shift Entered' : 'Add Shift';
+    $('addCard').hidden = done;
+    $('doneCard').hidden = !done;
+    if (done) renderDoneCard(dayShifts);
     $('addDow').textContent = DAY_LONG[d.getDay()].toUpperCase();
     $('addDval').textContent = fmtDateLong(sel);
     setUnlessFocused('addDate', sel);
@@ -1203,6 +1220,35 @@
     setUnlessFocused('addStart', draft.start);
     setUnlessFocused('addEnd', draft.end);
     syncSeg('addPhSeg', draft.phMode);
+  }
+
+  function renderDoneCard(shifts){
+    const card = $('doneCard');
+    card.innerHTML = '';
+    for (const s of shifts) {
+      const c = computeShift(s);
+      const d = inputToDate(s.date);
+      const ph = isPublicHoliday(s);
+      const badge = c.invalid ? '<span class="badge warn">Check times</span>' : (ph ? '<span class="badge ph">PH</span>' : '');
+      const times = `${fmtTime(s.start)} – ${fmtTime(s.end)}`;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'shift-main';
+      btn.setAttribute('aria-label', 'Edit shift ' + DAY_LONG[d.getDay()] + ' ' + fmtDateLong(s.date) + ', ' + times);
+      btn.innerHTML =
+        '<span class="sd"><span class="dow">' + DAY_SHORT[d.getDay()] + '</span><span class="dom">' + MON_SHORT[d.getMonth()] + ' ' + d.getDate() + '</span></span>' +
+        '<span class="mid"><span class="times">' + times + '</span>' +
+          '<span class="meta"><span>' + c.hours.toFixed(2) + ' h</span>' + badge + '<span>Tap to edit</span></span></span>' +
+        '<span class="pay"><span class="amt">' + money(c.gross) + '</span><span class="net">Net ' + money(c.net) + '</span></span>';
+      btn.addEventListener('click', () => openEdit(s.id));
+      card.appendChild(btn);
+    }
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'addanother';
+    add.textContent = '+ Add another shift';
+    add.addEventListener('click', () => { addAnother = true; renderAll(); });
+    card.appendChild(add);
   }
 
   function renderSimulator(){
@@ -1330,7 +1376,7 @@
      NAVIGATION
      ==================================================================== */
   function setTab(tab){ state.ui.tab = tab; saveState(); renderAll(); }
-  function setSelectedDate(str){ state.ui.selectedDate = str; draft.date = str; saveState(); renderAll(); }
+  function setSelectedDate(str){ state.ui.selectedDate = str; draft.date = str; addAnother = false; saveState(); renderAll(); }
   function navPeriod(dir){
     const d = inputToDate(state.ui.selectedDate);
     const tab = state.ui.tab;
@@ -1344,6 +1390,7 @@
      ADD / EDIT / DELETE
      ==================================================================== */
   const draft = { date: state.ui.selectedDate, start: '09:00', end: '17:00', phMode: 'auto' };
+  let addAnother = false;   /* true = show the Add Shift form even though the day already has shifts */
   let editId = null;
   let simHours = 1;
   let flashId = null;
@@ -1355,6 +1402,7 @@
     if (!s) { showSnack('Enter a valid date and times', null); return; }
     state.shifts.push(s);
     flashId = s.id;
+    addAnother = false;   /* the form swaps back to the entered-shift card */
     saveState();
     renderAll();
     /* button morph feedback */
