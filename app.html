@@ -144,19 +144,27 @@
     .goal .gtxt{ font-family:var(--mono); font-size:.76rem; color:var(--muted); margin-top:.5rem; }
     .goal .gtxt b{ color:var(--mint); font-weight:600; }
 
-    /* ---- month chart ---- */
-    .chartcard{ padding:1.25rem 1.3rem 1.1rem; }
-    .charthead{ display:flex; align-items:center; justify-content:space-between; }
-    .charthead .t{ font-family:var(--sans); font-size:.74rem; font-weight:600; letter-spacing:.13em; text-transform:uppercase; color:var(--muted); }
-    .charthead .peak{ font-family:var(--mono); font-size:.82rem; color:var(--faint); }
-    .charthead .peak b{ color:var(--mint); font-weight:600; }
-    .bars{ display:flex; align-items:flex-end; gap:2px; height:118px; margin-top:1.1rem; }
-    .bars .bcol{ flex:1; display:flex; align-items:flex-end; justify-content:center; height:100%; min-width:0; }
-    .bars .bcol .fill{ width:100%; max-width:14px; border-radius:6px 6px 3px 3px; background:var(--grad-soft);
-      box-shadow:0 0 12px -2px rgba(52,211,153,.4); transition:height .4s var(--sheet-ease); }
-    .bars .bcol.zero .fill{ background:rgba(255,255,255,.05); box-shadow:none; }
-    .xaxis{ display:grid; margin-top:.55rem; }
-    .xaxis span{ font-family:var(--mono); font-size:.68rem; color:var(--faint); text-align:center; }
+    /* ---- month calendar ---- */
+    .calcard{ padding:1.1rem .4rem 1rem; }   /* narrow sides + 3px gaps keep day cells ≥44px wide on 375px phones */
+    .calwk{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:.5rem; }
+    .calwk span{ text-align:center; font-family:var(--sans); font-size:.64rem; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
+    .calgrid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+    .calgrid .dcell{ min-height:52px; border-radius:10px; background:var(--tile); border:1px solid var(--line);
+      display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:.32rem .05rem; gap:.14rem; }
+    .calgrid .dcell.blank{ background:transparent; border-color:transparent; pointer-events:none; }
+    .calgrid .dcell .dn{ font-family:var(--mono); font-size:.8rem; color:var(--muted); }
+    .calgrid .dcell.worked .dn{ color:var(--text); font-weight:600; }
+    .calgrid .dcell .amt{ font-family:var(--mono); font-size:.6rem; color:var(--mint); }
+    .calgrid .dcell.today{ border-color:var(--mint); box-shadow:0 0 0 1px rgba(52,211,153,.4) inset; }
+    .calgrid .dcell.ph{ background:rgba(251,191,36,.12); border-color:rgba(251,191,36,.42); }
+    .calgrid .dcell.ph .dn{ color:var(--amber); font-weight:700; }
+    .calgrid .dcell.ph .amt.phtag{ color:var(--amber); font-weight:700; letter-spacing:.06em; }
+    .calgrid button.dcell:hover{ border-color:var(--line-2); background:var(--card-2); }
+    .calgrid button.dcell.ph:hover{ background:rgba(251,191,36,.2); }
+    .callegend{ display:flex; align-items:center; gap:.45rem; margin-top:.7rem; padding:0 .5rem; font-family:var(--mono); font-size:.68rem; color:var(--muted); }
+    .callegend .lg{ width:11px; height:11px; border-radius:4px; flex:none; }
+    .callegend .lg.ph{ background:rgba(251,191,36,.25); border:1px solid rgba(251,191,36,.5); }
+    .callegend .lg.worked{ background:rgba(52,211,153,.22); border:1px solid rgba(52,211,153,.45); margin-left:.6rem; }
 
     /* ==================================================================
        FIELD TILES (date row + clock tiles) — shared by add form & sheets
@@ -209,25 +217,6 @@
     .donecard .addanother:hover{ color:var(--mint-2); }
 
     /* ==================================================================
-       PAY SIMULATOR
-       ================================================================== */
-    .sim{ position:relative; overflow:hidden; padding:1.25rem 1.3rem 1.35rem;
-      background:radial-gradient(130% 120% at 100% 0%, rgba(59,130,246,.08), transparent 55%), var(--card); }
-    .sim .shead{ display:flex; align-items:center; gap:.55rem; color:var(--muted); font-size:.76rem; font-weight:600; letter-spacing:.11em; text-transform:uppercase; }
-    .sim .shead svg{ width:17px; height:17px; color:var(--muted); }
-    .simchips{ display:flex; gap:.55rem; margin-top:1.05rem; }
-    .simchips button{ flex:1; min-height:50px; border-radius:13px; background:var(--tile); border:1px solid var(--line);
-      color:var(--muted); font-family:var(--mono); font-size:.95rem; font-weight:600; transition:color .15s, border-color .15s, background .15s; }
-    .simchips button[aria-pressed="true"]{ background:rgba(59,130,246,.12); border-color:var(--blue); color:#7db3ff; }
-    .simbody{ display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; margin-top:1.15rem; }
-    .simbody .sleft{ min-width:0; }
-    .simbody .sleft .from{ font-family:var(--mono); font-size:.92rem; color:var(--muted); }
-    .simbody .sleft .rate{ font-family:var(--mono); font-size:.92rem; color:var(--faint); margin-top:.3rem; }
-    .simbody .sright{ text-align:right; flex:none; }
-    .simbody .sright .g{ font-family:var(--mono); font-size:2rem; font-weight:700; letter-spacing:-.02em; }
-    .simbody .sright .n{ font-family:var(--mono); font-size:.92rem; color:var(--muted); margin-top:.25rem; }
-
-    /* ==================================================================
        PERIOD BREAKDOWN
        ================================================================== */
     .breakdown{ padding:.5rem 1.3rem; }
@@ -242,6 +231,7 @@
        SHIFT HISTORY
        ================================================================== */
     .histhead{ display:flex; align-items:center; justify-content:space-between; padding:.1rem .2rem; }
+    .histhead[hidden], .histlist[hidden]{ display:none; }   /* day tab: the entered-shift card covers history */
     .histhead .clearall{ font-size:.92rem; font-weight:600; color:var(--mint); padding:.3rem .2rem; }
     .histhead .clearall:hover{ color:var(--mint-2); }
     .histlist{ list-style:none; display:flex; flex-direction:column; gap:.55rem; }
@@ -414,14 +404,11 @@
         </div>
       </section>
 
-      <!-- MONTH CHART (month tab only) -->
-      <section class="card chartcard" id="chartCard" hidden>
-        <div class="charthead">
-          <div class="t">Daily Earnings (Month)</div>
-          <div class="peak">Peak: <b id="chartPeak">$0</b></div>
-        </div>
-        <div class="bars" id="chartBars"></div>
-        <div class="xaxis" id="chartAxis"></div>
+      <!-- MONTH CALENDAR (month tab only) -->
+      <section class="card calcard" id="calCard" hidden>
+        <div class="calwk" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+        <div class="calgrid" id="calGrid"></div>
+        <div class="callegend" aria-hidden="true"><span class="lg ph"></span> Public holiday <span class="lg worked"></span> Worked</div>
       </section>
 
       <!-- ADD SHIFT / SHIFT ENTERED -->
@@ -460,37 +447,12 @@
         </button>
       </section>
 
-      <!-- PAY SIMULATOR -->
-      <section class="card sim">
-        <div class="shead">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 2l8.66 5v10L12 22l-8.66-5V7z"/></svg>
-          If I work now… (Pay Simulator)
-        </div>
-        <div class="simchips" id="simChips" role="group" aria-label="Simulate duration">
-          <button type="button" data-h="1" aria-pressed="true">1h</button>
-          <button type="button" data-h="2" aria-pressed="false">2h</button>
-          <button type="button" data-h="4" aria-pressed="false">4h</button>
-          <button type="button" data-h="6" aria-pressed="false">6h</button>
-          <button type="button" data-h="8" aria-pressed="false">8h</button>
-        </div>
-        <div class="simbody">
-          <div class="sleft">
-            <div class="from" id="simFrom">From —</div>
-            <div class="rate" id="simRate">$0.00/h</div>
-          </div>
-          <div class="sright">
-            <div class="g" id="simGross">$0.00</div>
-            <div class="n" id="simNet">Net $0.00</div>
-          </div>
-        </div>
-      </section>
-
       <!-- PERIOD BREAKDOWN -->
       <div class="label">Period Breakdown</div>
       <section class="card breakdown" id="breakdownCard"></section>
 
-      <!-- SHIFT HISTORY -->
-      <div class="histhead">
+      <!-- SHIFT HISTORY (week/month/year tabs — on the day tab the entered-shift card covers it) -->
+      <div class="histhead" id="histHead">
         <span class="label" style="padding:0;">Shift History</span>
         <button class="clearall" id="clearAllBtn" type="button">Clear All</button>
       </div>
@@ -632,10 +594,12 @@
   const MON_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const MON_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-  /* Victoria public holidays 2025–2026 (incl. 2026-09-25 AFL GF Eve). Yearly maintenance. */
+  /* Victoria public holidays 2025–2027. Yearly maintenance.
+     2027 AFL GF Eve is not yet announced (add it when the AFL fixture is out). */
   const VIC_HOLIDAYS = {
     '2025': ['2025-01-01','2025-01-27','2025-03-10','2025-04-18','2025-04-19','2025-04-20','2025-04-21','2025-04-25','2025-06-09','2025-09-26','2025-11-04','2025-12-25','2025-12-26'],
-    '2026': ['2026-01-01','2026-01-26','2026-03-09','2026-04-03','2026-04-04','2026-04-05','2026-04-06','2026-04-25','2026-06-08','2026-09-25','2026-11-03','2026-12-25','2026-12-26','2026-12-28']
+    '2026': ['2026-01-01','2026-01-26','2026-03-09','2026-04-03','2026-04-04','2026-04-05','2026-04-06','2026-04-25','2026-06-08','2026-09-25','2026-11-03','2026-12-25','2026-12-26','2026-12-28'],
+    '2027': ['2027-01-01','2027-01-26','2027-03-08','2027-03-26','2027-03-27','2027-03-28','2027-03-29','2027-04-25','2027-06-14','2027-11-02','2027-12-25','2027-12-26','2027-12-27','2027-12-28']
   };
 
   const AUD = new Intl.NumberFormat('en-AU', { style:'currency', currency:'AUD' });
@@ -881,14 +845,6 @@
     for (const k of RATE_KEYS) raw += buckets[k] * rates[k];
     return raw;
   }
-  /* Σ raw gross of the pay week containing `dateStr` (auto-mode simulator). */
-  function weekRawFor(dateStr){
-    const r = periodRange('week', dateStr);
-    let raw = 0;
-    for (const s of shiftsInRange(r.start, r.end)) raw += rawGrossOf(s);
-    return raw;
-  }
-
   /* Auto-mode per-shift tax allocation, cached and rebuilt lazily. Group the
      current shifts by pay week; weekTax = payg(weekRaw, weekEnd); each shift's
      tax = weekTax × shiftRaw / weekRaw (UNROUNDED here — rounded only for
@@ -919,7 +875,7 @@
      ==================================================================== */
   let todayStr = dateToInput(new Date());
   /* Keep "today" honest when the page survives past midnight (home-screen web
-     apps stay alive for days): re-check on refocus and on the simulator tick. */
+     apps stay alive for days): re-check on refocus and on the minute tick. */
   function refreshToday(){
     const t = dateToInput(new Date());
     if (t !== todayStr) { todayStr = t; renderAll(); }
@@ -1067,9 +1023,12 @@
       return { start: dateToInput(new Date(d.getFullYear(), d.getMonth(), 1)),
                end:   dateToInput(new Date(d.getFullYear(), d.getMonth()+1, 0)) };
     }
-    return { start: dateToInput(new Date(d.getFullYear(), 0, 1)),
-             end:   dateToInput(new Date(d.getFullYear(), 11, 31)) };
+    /* Year tab = Australian financial year (Jul 1 – Jun 30) */
+    const fy = fyStartYear(d);
+    return { start: dateToInput(new Date(fy, 6, 1)),
+             end:   dateToInput(new Date(fy + 1, 5, 30)) };
   }
+  function fyStartYear(d){ return d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1; }
   function shiftsInRange(start, end){
     return state.shifts
       .filter(s => s.date >= start && s.date <= end)     /* ISO strings compare correctly */
@@ -1092,9 +1051,8 @@
     renderTabs();
     renderPeriodNav();
     renderEarnings();
-    renderMonthChart();
+    renderCalendar();
     renderAddForm();
-    renderSimulator();
     renderBreakdown();
     renderHistory();
   }
@@ -1133,8 +1091,9 @@
       const t = inputToDate(todayStr);
       sub = relLabel('month', (d.getFullYear() - t.getFullYear()) * 12 + (d.getMonth() - t.getMonth()));
     } else {
-      title = String(d.getFullYear());
-      sub = relLabel('year', d.getFullYear() - inputToDate(todayStr).getFullYear());
+      const fy = fyStartYear(d);
+      title = `FY ${fy}–${String((fy + 1) % 100).padStart(2, '0')}`;
+      sub = relLabel('year', fy - fyStartYear(inputToDate(todayStr)));
     }
     $('periodTitle').textContent = title;
     $('periodSub').textContent = sub;
@@ -1166,40 +1125,39 @@
     }
   }
 
-  function renderMonthChart(){
-    const card = $('chartCard');
+  function renderCalendar(){
+    const card = $('calCard');
     if (state.ui.tab !== 'month') { card.hidden = true; return; }
     card.hidden = false;
 
     const d = inputToDate(state.ui.selectedDate);
     const y = d.getFullYear(), m = d.getMonth();
     const days = new Date(y, m+1, 0).getDate();
-    const grosses = [];
-    for (let i = 1; i <= days; i++) grosses.push(dayGross(dateToInput(new Date(y, m, i))));
-    const peak = Math.max(0, ...grosses);
-    $('chartPeak').textContent = '$' + Math.round(peak).toLocaleString('en-AU');
-
-    const bars = $('chartBars');
-    bars.innerHTML = '';
-    for (let i = 0; i < days; i++) {
-      const g = grosses[i];
-      const col = document.createElement('div');
-      col.className = 'bcol' + (g > 0 ? '' : ' zero');
-      const h = g > 0 && peak > 0 ? Math.max(10, (g / peak) * 100) : 6;
-      col.innerHTML = `<div class="fill" style="height:${h}%"></div>`;
-      col.title = `${MON_SHORT[m]} ${i+1}: ${money(g)}`;
-      bars.appendChild(col);
+    const lead = (new Date(y, m, 1).getDay() + 6) % 7;   /* Monday-first column of day 1 */
+    const grid = $('calGrid');
+    grid.innerHTML = '';
+    for (let i = 0; i < lead; i++) {
+      const blank = document.createElement('div');
+      blank.className = 'dcell blank';
+      grid.appendChild(blank);
     }
-
-    /* x-axis labels at 1 / 5 / 10 / 15 / 20 / 25 / last-day */
-    const axis = $('chartAxis');
-    axis.style.gridTemplateColumns = `repeat(${days}, 1fr)`;
-    axis.innerHTML = '';
-    const marks = new Set([1, 5, 10, 15, 20, 25, days]);
-    for (let i = 1; i <= days; i++) {
-      const s = document.createElement('span');
-      s.textContent = marks.has(i) ? i : '';
-      axis.appendChild(s);
+    for (let day = 1; day <= days; day++) {
+      const ds = dateToInput(new Date(y, m, day));
+      const dayShifts = state.shifts.filter(s => s.date === ds);
+      const worked = dayShifts.length > 0;   /* a recorded shift counts even if it grosses $0 */
+      const g = dayGross(ds);
+      /* Day counts as a holiday if it's on the VIC list or a shift was flagged PH by hand */
+      const ph = isVicPublicHoliday(ds) || dayShifts.some(isPublicHoliday);
+      const today = ds === todayStr;
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'dcell' + (worked ? ' worked' : '') + (ph ? ' ph' : '') + (today ? ' today' : '');
+      cell.innerHTML = '<span class="dn">' + day + '</span>' +
+        (worked ? '<span class="amt">$' + Math.round(g) + '</span>' : (ph ? '<span class="amt phtag">PH</span>' : ''));
+      if (today) cell.setAttribute('aria-current', 'date');
+      cell.setAttribute('aria-label', MON_SHORT[m] + ' ' + day + (today ? ', today' : '') + (ph ? ', public holiday' : '') + (worked ? ', earned ' + money(g) : '') + ' — open day');
+      cell.addEventListener('click', () => { state.ui.tab = 'day'; setSelectedDate(ds); });
+      grid.appendChild(cell);
     }
   }
 
@@ -1251,53 +1209,6 @@
     card.appendChild(add);
   }
 
-  function renderSimulator(){
-    const now = new Date();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    const dur = simHours;
-    const rawGross = simGross(nowMin, dur * 60, todayStr);
-    const gross = round2(rawGross);
-    let net;
-    if (state.settings.taxMode === 'manual') {
-      const tr = state.settings.taxRate / 100;
-      net = round2(gross * (1 - tr));
-    } else {
-      /* marginal ATO withholding on top of what's already earned this pay week */
-      const weekEnd = weekEndOf(todayStr), curWeekRaw = weekRawFor(todayStr);
-      const marginal = payg(curWeekRaw + rawGross, weekEnd) - payg(curWeekRaw, weekEnd);
-      net = round2(gross - marginal);
-    }
-    const blended = dur > 0 ? gross / dur : 0;
-    const hh = String(now.getHours()).padStart(2,'0'), mm = String(now.getMinutes()).padStart(2,'0');
-    $('simFrom').textContent = `From ${hh}:${mm} · ${dur}h`;
-    $('simRate').textContent = money(blended) + '/h';
-    $('simGross').textContent = money(gross);
-    $('simNet').textContent = 'Net ' + money(net);
-  }
-
-  /* Simulator pay for [startMin, startMin+durMin] with NO break; spans midnight if needed. */
-  function simGross(startMin, durMin, dateStr){
-    let remaining = durMin, cur = startMin, day = inputToDate(dateStr), gross = 0, guard = 0;
-    while (remaining > 0 && guard++ < 4) {
-      const segEnd = Math.min(cur + remaining, 1440);
-      gross += segmentGross(cur, segEnd, day);
-      remaining -= (segEnd - cur);
-      cur = 0;
-      day = new Date(day); day.setDate(day.getDate() + 1);
-    }
-    return gross;
-  }
-  function segmentGross(s, e, dayObj){
-    if (e <= s) return 0;
-    const r = ratesFor(dateToInput(dayObj));            /* simulator uses the era in force that day */
-    const ph = isVicPublicHoliday(dateToInput(dayObj));
-    const dow = dayObj.getDay();
-    if (ph) return (e - s) / 60 * r.ph;
-    if (dow >= 1 && dow <= 5) return overlap(s,e,-1e9,18*60)/60*r.base + overlap(s,e,18*60,1e9)/60*r.after18;
-    if (dow === 6) return (e - s) / 60 * r.sat;
-    return overlap(s,e,-1e9,9*60)/60*r.sun9 + overlap(s,e,9*60,1e9)/60*r.sun;
-  }
-
   function renderBreakdown(){
     const shifts = currentPeriodShifts();
     const meta = {
@@ -1329,7 +1240,14 @@
   }
 
   function renderHistory(){
+    /* Any re-render (tab/date change, data change) disarms a pending Clear All
+       confirmation, so "Confirm?" can never apply to a different period. */
+    if (clearArmed) { clearArmed = false; $('clearAllBtn').textContent = 'Clear All'; }
     const list = $('histList');
+    const dayTab = state.ui.tab === 'day';   /* day tab: the entered-shift card covers this */
+    $('histHead').hidden = dayTab;
+    list.hidden = dayTab;
+    if (dayTab) { flashId = null; return; }
     const shifts = currentPeriodShifts().slice().reverse();   /* newest first */
     list.innerHTML = '';
     if (shifts.length === 0) {
@@ -1392,7 +1310,6 @@
   const draft = { date: state.ui.selectedDate, start: '09:00', end: '17:00', phMode: 'auto' };
   let addAnother = false;   /* true = show the Add Shift form even though the day already has shifts */
   let editId = null;
-  let simHours = 1;
   let flashId = null;
 
   function addShift(){
@@ -1456,6 +1373,9 @@
     renderAll();
     showSnack('Shift duplicated', null);
   }
+  /* Same shift in substance — used so Undo never duplicates a re-entered shift. */
+  function sameShift(a, b){ return a.date === b.date && a.start === b.start && a.end === b.end; }
+
   function deleteShiftById(id, announce){
     const idx = state.shifts.findIndex(x => x.id === id);
     if (idx < 0) return;
@@ -1465,7 +1385,8 @@
     renderAll();
     const d = inputToDate(removed.date);
     showSnack(announce || `${DAY_SHORT[d.getDay()]}, ${MON_SHORT[d.getMonth()]} ${d.getDate()} shift deleted`, () => {
-      state.shifts.splice(Math.min(idx, state.shifts.length), 0, removed);   /* restore by id at original spot */
+      if (!state.shifts.some(x => sameShift(x, removed)))
+        state.shifts.splice(Math.min(idx, state.shifts.length), 0, removed);   /* restore at original spot */
       saveState(); renderAll();
     });
   }
@@ -1478,7 +1399,7 @@
     saveState();
     renderAll();
     showSnack(`${removed.length} shift${removed.length === 1 ? '' : 's'} cleared`, () => {
-      state.shifts = state.shifts.concat(removed);
+      state.shifts = state.shifts.concat(removed.filter(r => !state.shifts.some(x => sameShift(x, r))));
       saveState(); renderAll();
     });
   }
@@ -1977,15 +1898,6 @@
     bindSeg('addPhSeg', ph => { draft.phMode = ph; });
     $('addBtn').addEventListener('click', addShift);
 
-    /* simulator */
-    $('simChips').addEventListener('click', e => {
-      const b = e.target.closest('button[data-h]');
-      if (!b) return;
-      simHours = Number(b.dataset.h);
-      for (const x of $('simChips').querySelectorAll('button')) x.setAttribute('aria-pressed', String(x === b));
-      renderSimulator();
-    });
-
     /* history */
     $('clearAllBtn').addEventListener('click', () => {
       if (currentPeriodShifts().length === 0) { showSnack('No shifts in this period', null); return; }
@@ -2044,8 +1956,8 @@
      ==================================================================== */
   bindUI();
   renderAll();
-  /* simulator recomputes every minute while visible */
-  setInterval(() => { refreshToday(); renderSimulator(); }, 60000);
+  /* keep todayStr honest across midnight while the page stays open */
+  setInterval(refreshToday, 60000);
 
   window.__tt = { computeShift, splitBuckets, payg, ratesFor, state, RATE_KEYS, save: saveState, load: loadState };
   </script>
