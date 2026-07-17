@@ -25,13 +25,13 @@ _Screenshots use fictional sample data — every rate, date and figure in them i
 
 ## Highlights
 
-- **Four views** — **Day**, **Week**, **Month** and **Year** (the Australian financial year, 1 July – 30 June), each showing gross, tax, net and hours for the period, plus a breakdown by rate. Month is a Monday-first calendar with earnings per day and public holidays highlighted — tap a date to open it. Week and Month track progress against an optional goal.
-- **One tap to edit** — a day that already has a shift shows it as a card in place of the add form; tapping it opens the edit sheet. Other views list the period's shift history.
+- **Four views** — **Day**, **Week**, **Month** and **Year** (the Australian financial year, 1 July – 30 June), each showing gross, tax, net and hours for the period, plus a breakdown by rate. Month is a Monday-first calendar with earnings per day and public holidays highlighted — tap a date and its shifts (or the add form, for an empty day) appear right below, ready to edit. Week and Month track progress against an optional goal.
+- **One tap to edit** — a day that already has a shift shows it as a card in place of the add form; tapping it opens the edit sheet. No separate history list to scroll through — the calendar is the history.
 - **Penalty-rate engine** — splits a shift across weekday base / after‑18:00 / Saturday / Sunday (before and from 09:00) / public holiday, removes the unpaid break from the centre of the shift, and auto-detects Victorian public holidays.
 - **Automatic tax** — ATO **weekly PAYG withholding** (Scale 2, tax-free threshold claimed) computed per pay week and allocated back to each shift, so the net figure matches a real payslip. A flat manual % is available instead.
 - **Effective-dated pay rates** — a pay rise starts from a date: shifts before it keep the old rates, shifts after it use the new ones, and the breakdown lists each era separately. No retro-editing of past pay.
-- **Swipe‑to‑delete with undo** — in the shift history (Week / Month / Year), drag a card left (touch or mouse) to delete; a snackbar offers **Undo**. On the Day view, delete lives in the edit sheet — either way it is never gesture-only.
-- **Offline & private** — data lives only in `localStorage` on your device and is never transmitted. **CSV** and **JSON** export/import are manual backups.
+- **Delete with undo** — delete lives in the edit sheet; a snackbar offers **Undo**, and undo can never duplicate a shift you re‑entered in the meantime.
+- **Offline & private** — data lives only in `localStorage` on your device and is never transmitted. **JSON** export/import is the full backup; **CSV** export/import is for spreadsheets (importing merges by date and times, skipping rows already present).
 
 ## Engineering notes
 
@@ -42,11 +42,11 @@ A few things that went beyond "make it look nice":
 - **Honest tax.** Withholding is a weekly, non-linear function, so it is computed on the whole pay week and split back across that week's shifts pro rata — kept unrounded internally and rounded only for display.
 - **Safe undo.** Undo skips any shift whose date and times have already been re‑entered, so it can never duplicate a shift you re‑created during the undo window.
 - **Local-time dates everywhere** (never `new Date('YYYY-MM-DD')`), and "today" is re-checked when the page comes back into focus, so an app left open overnight doesn't log to yesterday.
-- **Accessibility.** Semantic roles/labels, focus management in the bottom sheets, keyboard-reachable delete + undo, `prefers-reduced-motion` support, ≥44px tap targets, WCAG-checked contrast.
+- **Accessibility.** Semantic roles/labels, focus management in the bottom sheets, keyboard-reachable delete + undo, `prefers-reduced-motion` support (including the calendar's scroll-to-day), ≥44px tap targets, WCAG-checked contrast.
 
 ## Pay rules
 
-The **calculation engine is the point, not the numbers** — the app ships with neutral sample rates only. Set your own in **Settings**: the six penalty rates, the unpaid break, your goals, and the date each pay rise takes effect.
+The **calculation engine is the point, not the numbers** — the app ships with neutral sample rates only. Set your own in **Settings**: the six penalty rates, your goals, and the date each pay rise takes effect. (The unpaid break is fixed at 30 minutes.)
 
 **Overnight shifts are not supported.** A shift that crosses midnight (clock‑off ≤ clock‑on) is flagged with a *Check times* warning rather than silently miscalculated — split it into two day entries.
 

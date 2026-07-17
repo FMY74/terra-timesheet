@@ -156,6 +156,10 @@
     .calgrid .dcell.worked .dn{ color:var(--text); font-weight:600; }
     .calgrid .dcell .amt{ font-family:var(--mono); font-size:.6rem; color:var(--mint); }
     .calgrid .dcell.today{ border-color:var(--mint); box-shadow:0 0 0 1px rgba(52,211,153,.4) inset; }
+    .calgrid .dcell.sel{ border-color:var(--mint); background:rgba(52,211,153,.12); }
+    .calgrid .dcell.sel .dn{ color:var(--text); }
+    /* .ph rules below would otherwise win the tie and hide the selection on holidays */
+    .calgrid .dcell.ph.sel{ border-color:var(--mint); box-shadow:0 0 0 2px rgba(52,211,153,.4) inset; }
     .calgrid .dcell.ph{ background:rgba(251,191,36,.12); border-color:rgba(251,191,36,.42); }
     .calgrid .dcell.ph .dn{ color:var(--amber); font-weight:700; }
     .calgrid .dcell.ph .amt.phtag{ color:var(--amber); font-weight:700; letter-spacing:.06em; }
@@ -228,24 +232,8 @@
     .empty{ text-align:center; color:var(--faint); font-size:.95rem; padding:2.1rem 1rem; }
 
     /* ==================================================================
-       SHIFT HISTORY
+       SHIFT ROW (entered-shift card)
        ================================================================== */
-    .histhead{ display:flex; align-items:center; justify-content:space-between; padding:.1rem .2rem; }
-    .histhead[hidden], .histlist[hidden]{ display:none; }   /* day tab: the entered-shift card covers history */
-    .histhead .clearall{ font-size:.92rem; font-weight:600; color:var(--mint); padding:.3rem .2rem; }
-    .histhead .clearall:hover{ color:var(--mint-2); }
-    .histlist{ list-style:none; display:flex; flex-direction:column; gap:.55rem; }
-    .shift{ position:relative; border-radius:16px; overflow:hidden; }
-    .shift-action{ position:absolute; inset:0; display:flex; align-items:center; justify-content:flex-end; gap:.5rem;
-      padding:0 1.4rem; background:linear-gradient(90deg, rgba(248,113,113,.15), var(--red)); color:#fff;
-      font-weight:600; letter-spacing:.04em; opacity:0; }
-    .shift.swiping .shift-action, .shift.will-delete .shift-action{ opacity:1; }
-    .shift-action svg{ width:20px; height:20px; }
-    .shift.will-delete .shift-action{ filter:brightness(1.05); }
-    .shift-card{ position:relative; background:var(--card); border:1px solid var(--line); border-radius:16px;
-      transform:translateX(0); transition:transform .38s var(--sheet-ease);
-      touch-action:pan-y; -webkit-user-select:none; user-select:none; will-change:transform; }
-    .shift-card.dragging{ transition:none; }
     .shift-main{ width:100%; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.9rem;
       padding:.95rem 1.1rem; text-align:left; }
     .shift-main .sd{ display:flex; flex-direction:column; min-width:2.6rem; }
@@ -261,8 +249,6 @@
       text-transform:uppercase; padding:.18rem .45rem; border-radius:6px; }
     .badge.ph{ background:rgba(52,211,153,.13); color:var(--mint); border:1px solid rgba(52,211,153,.3); }
     .badge.warn{ background:rgba(251,191,36,.13); color:var(--amber); border:1px solid rgba(251,191,36,.34); }
-    @keyframes flash{ 0%{ background:rgba(52,211,153,.22); } 100%{ background:var(--card); } }
-    .shift-card.flash{ animation:flash 1.1s ease-out; }
 
     /* ==================================================================
        BOTTOM SHEETS + SCRIM
@@ -451,12 +437,6 @@
       <div class="label">Period Breakdown</div>
       <section class="card breakdown" id="breakdownCard"></section>
 
-      <!-- SHIFT HISTORY (week/month/year tabs — on the day tab the entered-shift card covers it) -->
-      <div class="histhead" id="histHead">
-        <span class="label" style="padding:0;">Shift History</span>
-        <button class="clearall" id="clearAllBtn" type="button">Clear All</button>
-      </div>
-      <ul class="histlist" id="histList" aria-label="Shift history"></ul>
     </main>
   </div>
 
@@ -1054,7 +1034,6 @@
     renderCalendar();
     renderAddForm();
     renderBreakdown();
-    renderHistory();
   }
 
   function renderTabs(){
@@ -1149,14 +1128,26 @@
       /* Day counts as a holiday if it's on the VIC list or a shift was flagged PH by hand */
       const ph = isVicPublicHoliday(ds) || dayShifts.some(isPublicHoliday);
       const today = ds === todayStr;
+      const selected = ds === state.ui.selectedDate;
       const cell = document.createElement('button');
       cell.type = 'button';
-      cell.className = 'dcell' + (worked ? ' worked' : '') + (ph ? ' ph' : '') + (today ? ' today' : '');
+      cell.className = 'dcell' + (worked ? ' worked' : '') + (ph ? ' ph' : '') + (today ? ' today' : '') + (selected ? ' sel' : '');
       cell.innerHTML = '<span class="dn">' + day + '</span>' +
         (worked ? '<span class="amt">$' + Math.round(g) + '</span>' : (ph ? '<span class="amt phtag">PH</span>' : ''));
       if (today) cell.setAttribute('aria-current', 'date');
-      cell.setAttribute('aria-label', MON_SHORT[m] + ' ' + day + (today ? ', today' : '') + (ph ? ', public holiday' : '') + (worked ? ', earned ' + money(g) : '') + ' — open day');
-      cell.addEventListener('click', () => { state.ui.tab = 'day'; setSelectedDate(ds); });
+      cell.setAttribute('aria-pressed', String(selected));
+      cell.setAttribute('aria-label', MON_SHORT[m] + ' ' + day + (today ? ', today' : '') + (ph ? ', public holiday' : '') + (worked ? ', earned ' + money(g) : '') + ' — view day below');
+      /* Stay on the Month tab: selecting a day shows its shifts (or the add form)
+         in the panel right below the calendar, where they can be edited. */
+      cell.addEventListener('click', () => {
+        setSelectedDate(ds);
+        /* The re-render destroyed this cell — put focus back on its replacement
+           so keyboard users aren't dropped to <body>. */
+        const again = $('calGrid').querySelector('.dcell.sel');
+        if (again) again.focus({ preventScroll: true });
+        const panel = $('doneCard').hidden ? $('addCard') : $('doneCard');
+        panel.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'nearest' });
+      });
       grid.appendChild(cell);
     }
   }
@@ -1170,6 +1161,7 @@
     $('addCard').hidden = done;
     $('doneCard').hidden = !done;
     if (done) renderDoneCard(dayShifts);
+    else $('doneCard').innerHTML = '';   /* never keep stale rows in the hidden card */
     $('addDow').textContent = DAY_LONG[d.getDay()].toUpperCase();
     $('addDval').textContent = fmtDateLong(sel);
     setUnlessFocused('addDate', sel);
@@ -1239,51 +1231,6 @@
     $('breakdownCard').innerHTML = rows.length ? rows.join('') : '<div class="empty">No data for this period.</div>';
   }
 
-  function renderHistory(){
-    /* Any re-render (tab/date change, data change) disarms a pending Clear All
-       confirmation, so "Confirm?" can never apply to a different period. */
-    if (clearArmed) { clearArmed = false; $('clearAllBtn').textContent = 'Clear All'; }
-    const list = $('histList');
-    const dayTab = state.ui.tab === 'day';   /* day tab: the entered-shift card covers this */
-    $('histHead').hidden = dayTab;
-    list.hidden = dayTab;
-    if (dayTab) { flashId = null; return; }
-    const shifts = currentPeriodShifts().slice().reverse();   /* newest first */
-    list.innerHTML = '';
-    if (shifts.length === 0) {
-      list.innerHTML = '<li class="empty" style="list-style:none;">No shifts in this period.</li>';
-      return;
-    }
-    for (const s of shifts) {
-      const c = computeShift(s);
-      const d = inputToDate(s.date);
-      const ph = isPublicHoliday(s);
-      const badge = c.invalid ? '<span class="badge warn">Check times</span>' : (ph ? '<span class="badge ph">PH</span>' : '');
-      const times = `${fmtTime(s.start)} – ${fmtTime(s.end)}`;
-      const li = document.createElement('li');
-      li.className = 'shift';
-      li.dataset.id = s.id;
-      li.innerHTML =
-        '<div class="shift-action" aria-hidden="true"><span>Delete</span>' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>' +
-        '</div>' +
-        '<div class="shift-card">' +
-          '<button class="shift-main" type="button" aria-label="Edit shift ' + DAY_LONG[d.getDay()] + ' ' + fmtDateLong(s.date) + ', ' + times + '">' +
-            '<span class="sd"><span class="dow">' + DAY_SHORT[d.getDay()] + '</span><span class="dom">' + MON_SHORT[d.getMonth()] + ' ' + d.getDate() + '</span></span>' +
-            '<span class="mid"><span class="times">' + times + '</span>' +
-              '<span class="meta"><span>' + c.hours.toFixed(2) + ' h</span>' + badge + '</span></span>' +
-            '<span class="pay"><span class="amt">' + money(c.gross) + '</span><span class="net">Net ' + money(c.net) + '</span></span>' +
-          '</button>' +
-        '</div>';
-      const card = li.querySelector('.shift-card');
-      li.querySelector('.shift-main').addEventListener('click', () => openEdit(s.id));
-      attachSwipe(li, card, s.id);
-      if (s.id === flashId) { card.classList.add('flash'); }
-      list.appendChild(li);
-    }
-    flashId = null;
-  }
-
   function setUnlessFocused(id, value){ const el = $(id); if (document.activeElement !== el) el.value = value; }
   function syncSeg(segId, value, attr){
     attr = attr || 'ph';
@@ -1310,7 +1257,6 @@
   const draft = { date: state.ui.selectedDate, start: '09:00', end: '17:00', phMode: 'auto' };
   let addAnother = false;   /* true = show the Add Shift form even though the day already has shifts */
   let editId = null;
-  let flashId = null;
 
   function addShift(){
     const btn = $('addBtn'), label = $('addBtnLabel');
@@ -1318,7 +1264,6 @@
     const s = sanitizeShift({ id: genId(), date: state.ui.selectedDate, start: draft.start, end: draft.end, phMode: draft.phMode });
     if (!s) { showSnack('Enter a valid date and times', null); return; }
     state.shifts.push(s);
-    flashId = s.id;
     addAnother = false;   /* the form swaps back to the entered-shift card */
     saveState();
     renderAll();
@@ -1354,7 +1299,6 @@
     const cand = sanitizeShift({ id: s.id, date: editDraft.date, start: editDraft.start, end: editDraft.end, phMode: editDraft.phMode });
     if (!cand) { showSnack('Enter a valid date and times', null); return; }
     Object.assign(s, cand);
-    flashId = s.id;
     saveState();
     closeSheet();
     renderAll();
@@ -1367,7 +1311,6 @@
     const cand = sanitizeShift(copy);
     if (!cand) { showSnack('Enter a valid date and times', null); return; }
     state.shifts.push(cand);
-    flashId = cand.id;
     saveState();
     closeSheet();
     renderAll();
@@ -1380,118 +1323,21 @@
     const idx = state.shifts.findIndex(x => x.id === id);
     if (idx < 0) return;
     const removed = state.shifts[idx];
+    /* Multiplicity before deleting (counts `removed` itself): Undo restores only
+       while the identical-shift count is still below this — so it can't duplicate
+       a shift the user re-entered, yet still works when duplicates are intentional. */
+    const before = state.shifts.filter(x => sameShift(x, removed)).length;
     state.shifts.splice(idx, 1);
     saveState();
     renderAll();
     const d = inputToDate(removed.date);
     showSnack(announce || `${DAY_SHORT[d.getDay()]}, ${MON_SHORT[d.getMonth()]} ${d.getDate()} shift deleted`, () => {
-      if (!state.shifts.some(x => sameShift(x, removed)))
+      if (state.shifts.filter(x => sameShift(x, removed)).length < before)
         state.shifts.splice(Math.min(idx, state.shifts.length), 0, removed);   /* restore at original spot */
       saveState(); renderAll();
     });
   }
-  function clearAllPeriod(){
-    const shifts = currentPeriodShifts();
-    if (shifts.length === 0) return;
-    const ids = new Set(shifts.map(s => s.id));
-    const removed = state.shifts.filter(s => ids.has(s.id));   /* keep exact set for undo */
-    state.shifts = state.shifts.filter(s => !ids.has(s.id));
-    saveState();
-    renderAll();
-    showSnack(`${removed.length} shift${removed.length === 1 ? '' : 's'} cleared`, () => {
-      state.shifts = state.shifts.concat(removed.filter(r => !state.shifts.some(x => sameShift(x, r))));
-      saveState(); renderAll();
-    });
-  }
-
-  /* ====================================================================
-     SWIPE-TO-DELETE (Pointer Events + iOS touch fallback). touch-action:pan-y.
-     ==================================================================== */
   const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const THRESH = 0.4;
-
-  function animateDelete(li, card, id){
-    if (reduceMotion()) { deleteShiftById(id); return; }
-    const h = li.offsetHeight;
-    li.classList.add('will-delete');
-    card.style.transition = 'transform .26s cubic-bezier(.4,0,.6,1)';
-    card.style.transform = 'translateX(-110%)';
-    li.style.height = h + 'px'; li.style.overflow = 'hidden';
-    requestAnimationFrame(() => {
-      li.style.transition = 'height .28s ease, opacity .26s ease, margin .28s ease';
-      li.style.height = '0px'; li.style.opacity = '0'; li.style.marginTop = '0'; li.style.marginBottom = '0';
-    });
-    let done = false;
-    const finish = () => { if (done) return; done = true; deleteShiftById(id); };
-    li.addEventListener('transitionend', finish, { once: true });
-    setTimeout(finish, 440);
-  }
-
-  function attachSwipe(li, card, id){
-    let x0 = 0, y0 = 0, dx = 0, axis = null, active = false, pid = null;
-    /* Suppress only the click that immediately follows a horizontal drag.
-       (A one-shot capture blocker would stay armed after touch drags — where
-       no click fires — and silently eat the NEXT legitimate tap.) */
-    let suppressUntil = 0;
-    card.addEventListener('click', e => {
-      if (performance.now() < suppressUntil) { e.stopPropagation(); e.preventDefault(); suppressUntil = 0; }
-    }, true);
-
-    function start(cx, cy, pointerId){ x0 = cx; y0 = cy; dx = 0; axis = null; active = true; pid = pointerId; }
-    function move(cx, cy, ev){
-      if (!active) return true;
-      const ddx = cx - x0, ddy = cy - y0;
-      if (axis === null) {
-        if (Math.abs(ddx) > 8 || Math.abs(ddy) > 8) {
-          axis = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y';
-          if (axis === 'x') { card.classList.add('dragging'); li.classList.add('swiping'); }
-        }
-      }
-      if (axis === 'x') {
-        if (ev && ev.cancelable) ev.preventDefault();
-        const w = card.offsetWidth || 1;
-        let tx = Math.min(0, ddx);
-        if (tx < -w) tx = -w + (tx + w) * 0.3;   /* rubber-band */
-        card.style.transform = 'translateX(' + tx + 'px)';
-        dx = tx;
-        li.classList.toggle('will-delete', -tx > w * THRESH);
-        return false;
-      }
-      return true;
-    }
-    function end(){
-      if (!active) return;
-      const wasX = axis === 'x';
-      const w = card.offsetWidth || 1;
-      card.classList.remove('dragging');
-      li.classList.remove('swiping');
-      if (wasX && -dx > w * THRESH) { animateDelete(li, card, id); }
-      else { card.style.transform = ''; li.classList.remove('will-delete'); }
-      if (wasX) suppressUntil = performance.now() + 500;
-      active = false; axis = null;
-    }
-
-    if (window.PointerEvent) {
-      card.addEventListener('pointerdown', e => {
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
-        start(e.clientX, e.clientY, e.pointerId);
-      });
-      card.addEventListener('pointermove', e => {
-        if (e.pointerId !== pid) return;
-        if (!move(e.clientX, e.clientY, e) && card.hasPointerCapture && !card.hasPointerCapture(e.pointerId)) {
-          try { card.setPointerCapture(e.pointerId); } catch(_){}
-        }
-      });
-      card.addEventListener('pointerup', e => { if (e.pointerId === pid) end(); });
-      card.addEventListener('pointercancel', e => { if (e.pointerId === pid) end(); });
-    } else {
-      /* iOS touch-event fallback (older WebKit standalone web apps) */
-      card.addEventListener('touchstart', e => { const t = e.changedTouches[0]; start(t.clientX, t.clientY, t.identifier); }, { passive: true });
-      card.addEventListener('touchmove', e => { const t = e.changedTouches[0]; move(t.clientX, t.clientY, e); }, { passive: false });
-      card.addEventListener('touchend', end);
-      card.addEventListener('touchcancel', end);
-    }
-  }
 
   /* ====================================================================
      BOTTOM SHEETS — focus trap, Escape, scrim click.
@@ -1820,6 +1666,11 @@
     let parsed = null;
     try { parsed = JSON.parse(text); } catch(_) { throw new Error('Not valid JSON.'); }
     if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.shifts)) throw new Error('Not a Wagetrack backup.');
+    /* Fail-closed: every shift must validate. A partial restore would silently
+       drop pay records while replacing the user's existing data. */
+    for (let i = 0; i < parsed.shifts.length; i++) {
+      if (!sanitizeShift(parsed.shifts[i])) throw new Error(`shift ${i + 1} in the backup is invalid — nothing was restored.`);
+    }
     const cand = normalizeState(parsed);   /* full validation into a candidate first */
     state.shifts = cand.shifts;
     state.settings = cand.settings;
@@ -1898,15 +1749,6 @@
     bindSeg('addPhSeg', ph => { draft.phMode = ph; });
     $('addBtn').addEventListener('click', addShift);
 
-    /* history */
-    $('clearAllBtn').addEventListener('click', () => {
-      if (currentPeriodShifts().length === 0) { showSnack('No shifts in this period', null); return; }
-      if (clearArmed) { clearArmed = false; $('clearAllBtn').textContent = 'Clear All'; clearAllPeriod(); return; }
-      clearArmed = true;
-      $('clearAllBtn').textContent = 'Confirm?';
-      setTimeout(() => { if (clearArmed) { clearArmed = false; $('clearAllBtn').textContent = 'Clear All'; } }, 3500);
-    });
-
     /* edit sheet */
     $('editDate').addEventListener('change', e => { if (isDateStr(e.target.value)) { editDraft.date = e.target.value; syncEditSheet(); } });
     $('editStart').addEventListener('change', e => { if (isTimeStr(e.target.value)) { editDraft.start = e.target.value; $('editStartDisp').textContent = fmtTime(editDraft.start); } });
@@ -1936,8 +1778,6 @@
     $('importCsvFile').addEventListener('change', e => readFile(e, importCsv));
     $('restoreJsonFile').addEventListener('change', e => readFile(e, restoreJson));
   }
-  let clearArmed = false;
-
   function readFile(e, handler){
     const file = e.target.files && e.target.files[0];
     if (!file) return;

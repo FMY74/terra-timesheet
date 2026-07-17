@@ -1,9 +1,11 @@
 # Terra Timesheet v2 — "Wallet" UI redesign
 
 > **Historical design snapshot (2026-07-06).** The shipped app has since evolved: the pay
-> simulator was removed, the month bar chart became a Monday-first calendar, days with a
-> shift show an entered-shift card instead of the add form, and the Year view follows the
-> Australian financial year (1 Jul – 30 Jun). `app.html` is the source of truth.
+> simulator was removed, the month bar chart became a Monday-first calendar (tap a day to
+> view/edit it in place), days with a shift show an entered-shift card instead of the add
+> form, the shift-history list and swipe-to-delete were retired (the calendar covers
+> browsing; delete lives in the edit sheet), and the Year view follows the Australian
+> financial year (1 Jul – 30 Jun). `app.html` is the source of truth.
 
 2026-07-06. Owner has used a personal timesheet PWA ("PayWallet"-style UI) daily for ~2 months and
 prefers that UI over the current trading-terminal design. This spec rebuilds the app with that UI,
