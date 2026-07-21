@@ -219,6 +219,13 @@
     .donecard .addanother{ width:100%; min-height:50px; display:flex; align-items:center; justify-content:center;
       gap:.4rem; color:var(--mint); font-weight:600; font-size:.92rem; }
     .donecard .addanother:hover{ color:var(--mint-2); }
+    /* per-shift rate-band breakdown, nested under a shift's summary row */
+    .donecard .daybreak{ padding:.1rem .3rem .35rem; }
+    .donecard .daybreak .brow{ display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.5rem .25rem; border-bottom:1px solid var(--line); }
+    .donecard .daybreak .brow:last-child{ border-bottom:none; }
+    .donecard .daybreak .bk{ font-size:.82rem; color:var(--muted); }
+    .donecard .daybreak .bk small{ display:block; font-family:var(--mono); font-size:.7rem; color:var(--faint); margin-top:.15rem; }
+    .donecard .daybreak .bv{ font-family:var(--mono); font-size:.86rem; font-weight:600; }
 
     /* ==================================================================
        PERIOD BREAKDOWN
@@ -1209,6 +1216,15 @@
         '<span class="pay"><span class="amt">' + money(c.gross) + '</span><span class="net">Net ' + money(c.net) + '</span></span>';
       btn.addEventListener('click', () => openEdit(s.id));
       card.appendChild(btn);
+      /* Per-shift rate-band breakdown (e.g. base to 18:00, after 18:00) so the
+         day's composition is visible without opening the edit sheet. */
+      const rows = breakdownRowsHtml([s]);
+      if (rows) {
+        const bd = document.createElement('div');
+        bd.className = 'daybreak';
+        bd.innerHTML = rows;
+        card.appendChild(bd);
+      }
     }
     const add = document.createElement('button');
     add.type = 'button';
@@ -1218,14 +1234,15 @@
     card.appendChild(add);
   }
 
-  function renderBreakdown(){
-    const shifts = currentPeriodShifts();
-    const meta = {
-      base:'Weekday base', after18:'Weekday after 18:00', sat:'Saturday',
-      sun9:'Sunday before 9:00', sun:'Sunday', ph:'Public holiday'
-    };
-    /* Group by (bucket, rate) so a period spanning a rate change shows one row
-       per rate. `order` = earliest era index contributing (for stable ordering). */
+  const RATE_LABELS = {
+    base:'Weekday base', after18:'Weekday after 18:00', sat:'Saturday',
+    sun9:'Sunday before 9:00', sun:'Sunday', ph:'Public holiday'
+  };
+  /* Group `shifts` by (bucket, rate) so a span crossing a rate change shows one
+     row per rate. `order` = earliest era index contributing (stable ordering).
+     Returns the .brow rows HTML, or '' when nothing is paid. Shared by the
+     period breakdown and each day's shift card. */
+  function breakdownRowsHtml(shifts){
     const groups = new Map();
     for (const s of shifts) {
       const b = splitBuckets(s).buckets;
@@ -1239,13 +1256,17 @@
         if (index < g.order) g.order = index;
       }
     }
-    const rows = Array.from(groups.values())
+    return Array.from(groups.values())
       .sort((a, b) => (RATE_KEYS.indexOf(a.bucket) - RATE_KEYS.indexOf(b.bucket)) || (a.order - b.order) || (a.rate - b.rate))
       .map(g => {
         const amt = round2(g.hours * g.rate);
-        return `<div class="brow"><div class="bk">${meta[g.bucket]}<small>${g.hours.toFixed(2)} h · ${money(g.rate)}/h</small></div><div class="bv">${money(amt)}</div></div>`;
-      });
-    $('breakdownCard').innerHTML = rows.length ? rows.join('') : '<div class="empty">No data for this period.</div>';
+        return `<div class="brow"><div class="bk">${RATE_LABELS[g.bucket]}<small>${g.hours.toFixed(2)} h · ${money(g.rate)}/h</small></div><div class="bv">${money(amt)}</div></div>`;
+      })
+      .join('');
+  }
+  function renderBreakdown(){
+    const html = breakdownRowsHtml(currentPeriodShifts());
+    $('breakdownCard').innerHTML = html || '<div class="empty">No data for this period.</div>';
   }
 
   function setUnlessFocused(id, value){ const el = $(id); if (document.activeElement !== el) el.value = value; }
