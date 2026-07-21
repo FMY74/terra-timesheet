@@ -390,7 +390,7 @@
         </div>
       </section>
 
-      <!-- MONTH CALENDAR (month tab only) -->
+      <!-- CALENDAR — Week strip (Mon–Sun) on the Week tab, full grid on the Month tab -->
       <section class="card calcard" id="calCard" hidden>
         <div class="calwk" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
         <div class="calgrid" id="calGrid"></div>
@@ -1104,51 +1104,68 @@
     }
   }
 
-  function renderCalendar(){
-    const card = $('calCard');
-    if (state.ui.tab !== 'month') { card.hidden = true; return; }
-    card.hidden = false;
+  /* One tappable calendar cell for date `ds`, shared by the Week strip and the
+     Month grid. Everything (month label, day number) is derived from `ds`, so a
+     week that straddles two months labels each cell correctly. */
+  function makeDayCell(ds){
+    const dt = inputToDate(ds);
+    const day = dt.getDate(), mon = dt.getMonth();
+    const dayShifts = state.shifts.filter(s => s.date === ds);
+    const worked = dayShifts.length > 0;   /* a recorded shift counts even if it grosses $0 */
+    const g = dayGross(ds);
+    /* Day counts as a holiday if it's on the VIC list or a shift was flagged PH by hand */
+    const ph = isVicPublicHoliday(ds) || dayShifts.some(isPublicHoliday);
+    const today = ds === todayStr;
+    const selected = ds === state.ui.selectedDate;
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = 'dcell' + (worked ? ' worked' : '') + (ph ? ' ph' : '') + (today ? ' today' : '') + (selected ? ' sel' : '');
+    cell.innerHTML = '<span class="dn">' + day + '</span>' +
+      (worked ? '<span class="amt">$' + Math.round(g) + '</span>' : (ph ? '<span class="amt phtag">PH</span>' : ''));
+    if (today) cell.setAttribute('aria-current', 'date');
+    cell.setAttribute('aria-pressed', String(selected));
+    cell.setAttribute('aria-label', MON_SHORT[mon] + ' ' + day + (today ? ', today' : '') + (ph ? ', public holiday' : '') + (worked ? ', earned ' + money(g) : '') + ' — view day below');
+    /* Stay on the current tab: selecting a day shows its shifts (or the add form)
+       in the panel right below the calendar, where they can be edited. */
+    cell.addEventListener('click', () => {
+      setSelectedDate(ds);
+      /* The re-render destroyed this cell — put focus back on its replacement
+         so keyboard users aren't dropped to <body>. */
+      const again = $('calGrid').querySelector('.dcell.sel');
+      if (again) again.focus({ preventScroll: true });
+      const panel = $('doneCard').hidden ? $('addCard') : $('doneCard');
+      panel.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'nearest' });
+    });
+    return cell;
+  }
 
-    const d = inputToDate(state.ui.selectedDate);
+  function renderCalendar(){
+    const card = $('calCard'), tab = state.ui.tab;
+    if (tab !== 'month' && tab !== 'week') { card.hidden = true; return; }
+    card.hidden = false;
+    const grid = $('calGrid');
+    grid.innerHTML = '';
+
+    if (tab === 'week') {                                  /* Mon–Sun strip of the selected week */
+      const mon = inputToDate(mondayOf(state.ui.selectedDate));
+      for (let i = 0; i < 7; i++) {
+        const dd = new Date(mon); dd.setDate(mon.getDate() + i);
+        grid.appendChild(makeDayCell(dateToInput(dd)));
+      }
+      return;
+    }
+
+    const d = inputToDate(state.ui.selectedDate);          /* full month grid */
     const y = d.getFullYear(), m = d.getMonth();
     const days = new Date(y, m+1, 0).getDate();
     const lead = (new Date(y, m, 1).getDay() + 6) % 7;   /* Monday-first column of day 1 */
-    const grid = $('calGrid');
-    grid.innerHTML = '';
     for (let i = 0; i < lead; i++) {
       const blank = document.createElement('div');
       blank.className = 'dcell blank';
       grid.appendChild(blank);
     }
     for (let day = 1; day <= days; day++) {
-      const ds = dateToInput(new Date(y, m, day));
-      const dayShifts = state.shifts.filter(s => s.date === ds);
-      const worked = dayShifts.length > 0;   /* a recorded shift counts even if it grosses $0 */
-      const g = dayGross(ds);
-      /* Day counts as a holiday if it's on the VIC list or a shift was flagged PH by hand */
-      const ph = isVicPublicHoliday(ds) || dayShifts.some(isPublicHoliday);
-      const today = ds === todayStr;
-      const selected = ds === state.ui.selectedDate;
-      const cell = document.createElement('button');
-      cell.type = 'button';
-      cell.className = 'dcell' + (worked ? ' worked' : '') + (ph ? ' ph' : '') + (today ? ' today' : '') + (selected ? ' sel' : '');
-      cell.innerHTML = '<span class="dn">' + day + '</span>' +
-        (worked ? '<span class="amt">$' + Math.round(g) + '</span>' : (ph ? '<span class="amt phtag">PH</span>' : ''));
-      if (today) cell.setAttribute('aria-current', 'date');
-      cell.setAttribute('aria-pressed', String(selected));
-      cell.setAttribute('aria-label', MON_SHORT[m] + ' ' + day + (today ? ', today' : '') + (ph ? ', public holiday' : '') + (worked ? ', earned ' + money(g) : '') + ' — view day below');
-      /* Stay on the Month tab: selecting a day shows its shifts (or the add form)
-         in the panel right below the calendar, where they can be edited. */
-      cell.addEventListener('click', () => {
-        setSelectedDate(ds);
-        /* The re-render destroyed this cell — put focus back on its replacement
-           so keyboard users aren't dropped to <body>. */
-        const again = $('calGrid').querySelector('.dcell.sel');
-        if (again) again.focus({ preventScroll: true });
-        const panel = $('doneCard').hidden ? $('addCard') : $('doneCard');
-        panel.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'nearest' });
-      });
-      grid.appendChild(cell);
+      grid.appendChild(makeDayCell(dateToInput(new Date(y, m, day))));
     }
   }
 
