@@ -41,6 +41,8 @@
       --mono:'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
       --maxw:560px;
       --sheet-ease:cubic-bezier(.22,.75,.25,1);
+      --ease-out:cubic-bezier(.23,1,.32,1);   /* press-in / entrances */
+      --dur-press:120ms;                       /* press feedback: felt, never waited on */
     }
 
     *,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
@@ -80,8 +82,7 @@
     .brand h1{ font-size:1.5rem; font-weight:700; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .gear{ width:46px; height:46px; flex:none; border-radius:13px; border:1px solid var(--line);
       background:var(--card); display:grid; place-items:center; color:var(--muted);
-      transition:border-color .15s, color .15s, background .15s; }
-    .gear:hover{ border-color:var(--line-2); color:var(--text); background:var(--card-2); }
+      transition:border-color .15s, color .15s, background .15s, transform var(--dur-press) var(--ease-out); }
     .gear svg{ width:22px; height:22px; }
 
     /* ==================================================================
@@ -91,10 +92,9 @@
       background:var(--card); border:1px solid var(--line); border-radius:20px; }
     .tab{ flex:1; height:50px; border-radius:15px; color:var(--muted);
       font-size:1.02rem; font-weight:500; letter-spacing:.01em;
-      transition:color .18s, background .18s, box-shadow .18s; }
+      transition:color .18s, background .18s, box-shadow .18s, transform var(--dur-press) var(--ease-out); }
     .tab[aria-selected="true"]{ color:#fff; background:#1a2231; border:1px solid var(--line-2);
       box-shadow:0 4px 14px -6px rgba(0,0,0,.6); font-weight:600; }
-    .tab:not([aria-selected="true"]):hover{ color:var(--text); }
 
     /* ==================================================================
        CARDS
@@ -106,12 +106,10 @@
     /* ---- period nav ---- */
     .pnav{ display:flex; align-items:center; justify-content:space-between; padding:.9rem 1rem; }
     .pnav .chev{ width:46px; height:46px; border-radius:12px; color:var(--muted); display:grid; place-items:center;
-      transition:color .15s, background .15s; }
-    .pnav .chev:hover{ color:var(--text); background:var(--card-2); }
+      transition:color .15s, background .15s, transform var(--dur-press) var(--ease-out); }
     .pnav .chev svg{ width:24px; height:24px; }
     .pnav .mid{ flex:1; text-align:center; border-radius:12px; padding:.3rem .4rem;
-      transition:background .15s; min-width:0; }
-    .pnav .mid:hover{ background:var(--card-2); }
+      transition:background .15s, transform var(--dur-press) var(--ease-out); min-width:0; }
     .pnav .mid .t{ font-size:1.3rem; font-weight:700; letter-spacing:-.01em; line-height:1.15; }
     .pnav .mid .s{ font-family:var(--mono); font-size:.82rem; color:var(--muted); margin-top:.15rem; letter-spacing:.01em; }
 
@@ -150,7 +148,7 @@
     .calwk span{ text-align:center; font-family:var(--sans); font-size:.64rem; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
     .calgrid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
     .calgrid .dcell{ min-height:52px; border-radius:10px; background:var(--tile); border:1px solid var(--line);
-      display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:.32rem .05rem; gap:.14rem; }
+      display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:.32rem .05rem; gap:.14rem; transition:transform var(--dur-press) var(--ease-out); }
     .calgrid .dcell.blank{ background:transparent; border-color:transparent; pointer-events:none; }
     .calgrid .dcell .dn{ font-family:var(--mono); font-size:.8rem; color:var(--muted); }
     .calgrid .dcell.worked .dn{ color:var(--text); font-weight:600; }
@@ -163,8 +161,6 @@
     .calgrid .dcell.ph{ background:rgba(251,191,36,.12); border-color:rgba(251,191,36,.42); }
     .calgrid .dcell.ph .dn{ color:var(--amber); font-weight:700; }
     .calgrid .dcell.ph .amt.phtag{ color:var(--amber); font-weight:700; letter-spacing:.06em; }
-    .calgrid button.dcell:hover{ border-color:var(--line-2); background:var(--card-2); }
-    .calgrid button.dcell.ph:hover{ background:rgba(251,191,36,.2); }
     .callegend{ display:flex; align-items:center; gap:.45rem; margin-top:.7rem; padding:0 .5rem; font-family:var(--mono); font-size:.68rem; color:var(--muted); }
     .callegend .lg{ width:11px; height:11px; border-radius:4px; flex:none; }
     .callegend .lg.ph{ background:rgba(251,191,36,.25); border:1px solid rgba(251,191,36,.5); }
@@ -199,26 +195,27 @@
     .phrow{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.15rem .15rem; }
     .phrow .phlabel{ font-family:var(--sans); font-size:.72rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
     .seg{ display:inline-flex; background:var(--tile); border:1px solid var(--line); border-radius:12px; padding:3px; gap:2px; }
-    .seg button{ min-height:44px; padding:0 .95rem; border-radius:10px; font-size:.85rem; font-weight:500; color:var(--muted); transition:color .15s, background .15s; }
+    .seg button{ min-height:44px; padding:0 .95rem; border-radius:10px; font-size:.85rem; font-weight:500; color:var(--muted); transition:color .15s, background .15s, transform var(--dur-press) var(--ease-out); }
     .seg button[aria-pressed="true"]{ background:var(--card-2); color:var(--text); border:1px solid var(--line-2); font-weight:600; }
 
     /* ---- primary gradient button ---- */
     .btn-primary{ width:100%; min-height:56px; border-radius:16px; background:var(--grad); color:var(--on-grad);
       font-size:1.08rem; font-weight:700; letter-spacing:.01em; display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
-      box-shadow:0 10px 30px -12px rgba(52,211,153,.6); transition:transform .12s, filter .15s; }
-    .btn-primary:hover{ filter:brightness(1.05); }
-    .btn-primary:active{ transform:translateY(1px); }
+      box-shadow:0 10px 30px -12px rgba(52,211,153,.6); transition:transform var(--dur-press) var(--ease-out), filter .15s; }
     .btn-primary svg{ width:20px; height:20px; }
     .btn-primary.done{ background:linear-gradient(103deg,#2bbd88,#2f9f7a); }
 
     /* Shift-entered card (replaces the Add Shift form when the selected day already has shifts) */
     .form[hidden]{ display:none; }         /* author display:flex would otherwise defeat [hidden] */
     .donecard{ padding:.3rem .55rem; }
-    .donecard .shift-main{ border-radius:12px; border-bottom:1px solid var(--line); }
-    .donecard .shift-main:hover{ background:var(--card-2); }
+    .donecard .shift-main{ border-radius:12px; border-bottom:1px solid var(--line); transition:transform var(--dur-press) var(--ease-out); }
     .donecard .addanother{ width:100%; min-height:50px; display:flex; align-items:center; justify-content:center;
-      gap:.4rem; color:var(--mint); font-weight:600; font-size:.92rem; }
-    .donecard .addanother:hover{ color:var(--mint-2); }
+      gap:.4rem; color:var(--mint); font-weight:600; font-size:.92rem; transition:transform var(--dur-press) var(--ease-out); }
+    /* A just-added or Undo-restored shift enters (200ms fade + 6px rise) instead of
+       teleporting in. Only that one card gets .is-new — renderAll() rebuilds the list
+       on every tab change and those must stay instant. */
+    .donecard .is-new{ transition:opacity .2s ease, transform .2s var(--ease-out); }
+    @starting-style{ .donecard .is-new{ opacity:0; transform:translateY(6px); } }
     /* per-shift rate-band breakdown, nested under a shift's summary row */
     .donecard .daybreak{ padding:.1rem .3rem .35rem; }
     .donecard .daybreak .brow{ display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.5rem .25rem; border-bottom:1px solid var(--line); }
@@ -266,7 +263,7 @@
     .sheet{ position:fixed; left:0; right:0; bottom:0; z-index:500; background:#0b0f16;
       border-top:1px solid var(--line-2); border-radius:28px 28px 0 0; padding:.75rem 1.25rem calc(env(safe-area-inset-bottom) + 1.5rem);
       max-height:92vh; overflow-y:auto; transform:translateY(100%);
-      visibility:hidden; transition:transform .34s var(--sheet-ease), visibility 0s linear .34s;
+      visibility:hidden; transition:transform .26s var(--sheet-ease), visibility 0s linear .26s;   /* exit ~25% quicker than entry */
       width:min(100%, 620px); margin-inline:auto; }
     .sheet.open{ transform:translateY(0); visibility:visible; transition:transform .34s var(--sheet-ease); }
     .sheet.sheet-dragging{ transition:none; }   /* follow the finger 1:1 while pulling down */
@@ -277,11 +274,9 @@
     .sheet .secondary{ display:grid; grid-template-columns:repeat(3,1fr); gap:.6rem; margin-top:.7rem; }
     .btn-2{ min-height:52px; border-radius:14px; background:var(--card); border:1px solid var(--line); color:var(--text);
       font-size:.98rem; font-weight:600; display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:.15rem;
-      transition:border-color .15s, background .15s; }
+      transition:border-color .15s, background .15s, transform var(--dur-press) var(--ease-out); }
     .btn-2 .emo{ font-size:1.1rem; }
-    .btn-2:hover{ border-color:var(--line-2); background:var(--card-2); }
     .btn-2.danger{ color:var(--red); border-color:rgba(248,113,113,.32); background:rgba(248,113,113,.06); }
-    .btn-2.danger:hover{ background:rgba(248,113,113,.12); }
 
     /* settings rows */
     .setrow{ display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.05rem 0; border-bottom:1px solid var(--line); }
@@ -298,24 +293,21 @@
       color:var(--muted); margin:1.5rem 0 .2rem; }
     .quiet-actions{ display:grid; grid-template-columns:repeat(2,1fr); gap:.6rem; margin-top:1rem; }
     .btn-quiet{ min-height:48px; border-radius:12px; background:transparent; border:1px solid var(--line); color:var(--muted);
-      font-size:.9rem; font-weight:500; transition:color .15s, border-color .15s; }
-    .btn-quiet:hover{ color:var(--text); border-color:var(--line-2); }
+      font-size:.9rem; font-weight:500; transition:color .15s, border-color .15s, transform var(--dur-press) var(--ease-out); }
     .btn-danger-wide{ width:100%; min-height:54px; border-radius:14px; margin-top:1rem; background:rgba(248,113,113,.06);
-      border:1px solid rgba(248,113,113,.34); color:var(--red); font-size:1rem; font-weight:600; transition:background .15s; }
-    .btn-danger-wide:hover{ background:rgba(248,113,113,.13); }
+      border:1px solid rgba(248,113,113,.34); color:var(--red); font-size:1rem; font-weight:600; transition:background .15s, transform var(--dur-press) var(--ease-out); }
 
     /* rate-era selector (segmented pills, one per effective-dated rate set) */
     .eraseg{ display:flex; flex-wrap:wrap; gap:3px; background:var(--tile); border:1px solid var(--line);
       border-radius:12px; padding:3px; margin:.55rem 0 .2rem; }
     .eraseg button{ flex:1 1 auto; min-height:44px; padding:0 .85rem; border-radius:10px; font-size:.82rem; font-weight:500;
-      color:var(--muted); white-space:nowrap; transition:color .15s, background .15s; }
+      color:var(--muted); white-space:nowrap; transition:color .15s, background .15s, transform var(--dur-press) var(--ease-out); }
     .eraseg button[aria-pressed="true"]{ background:var(--card-2); color:var(--text); border:1px solid var(--line-2); font-weight:600; }
     .setrow[hidden]{ display:none; }   /* author display:flex would otherwise defeat [hidden] */
     #eraFromRow input{ width:170px; }
     .era-actions{ display:flex; gap:.6rem; margin-top:.9rem; }
     .era-actions .btn-quiet{ flex:1; margin:0; }
     .era-actions .btn-quiet.danger{ color:var(--red); border-color:rgba(248,113,113,.32); }
-    .era-actions .btn-quiet.danger:hover{ color:var(--red); background:rgba(248,113,113,.10); border-color:rgba(248,113,113,.5); }
 
     /* ==================================================================
        SNACKBAR
@@ -323,12 +315,12 @@
     .snackbar{ position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 1.1rem); transform:translate(-50%,180%);
       z-index:900; display:flex; align-items:center; gap:.9rem; width:min(100% - 1.75rem, 460px);
       padding:.7rem .7rem .7rem 1.15rem; background:#12181f; border:1px solid var(--line-2); border-radius:16px;
-      box-shadow:0 20px 50px -18px rgba(0,0,0,.8); opacity:0; transition:transform .35s var(--sheet-ease), opacity .25s; }
-    .snackbar.show{ transform:translate(-50%,0); opacity:1; }
+      box-shadow:0 20px 50px -18px rgba(0,0,0,.8); opacity:0; transition:transform .28s var(--sheet-ease), opacity .2s; }   /* exit */
+    .snackbar.show{ transform:translate(-50%,0); opacity:1; transition:transform .35s var(--sheet-ease), opacity .25s; }   /* entry */
     .snackbar:not(.show){ pointer-events:none; }
     .snackbar .msg{ flex:1; font-size:.92rem; font-weight:500; }
     .snackbar .undo{ flex:none; min-height:42px; padding:0 1.1rem; border-radius:11px; background:var(--grad); color:var(--on-grad);
-      font-family:var(--mono); font-weight:700; font-size:.78rem; letter-spacing:.06em; text-transform:uppercase; }
+      font-family:var(--mono); font-weight:700; font-size:.78rem; letter-spacing:.06em; text-transform:uppercase; transition:transform var(--dur-press) var(--ease-out); }
     .snackbar .undo[hidden]{ display:none; }
 
     /* ==================================================================
@@ -339,8 +331,42 @@
          and reintroduces column overlap on narrow phones) */
       .clocktile .ctime{ font-size:1.6rem; }
     }
+    /* ---- press-in feedback ----
+       Touch has no hover, so the press itself is the only "I heard you".
+       120ms / 3%: felt, never waited on. */
+    .gear:active, .tab:active, .pnav .chev:active, .pnav .mid:active, .calgrid button.dcell:active,
+    .seg button:active, .eraseg button:active, .btn-primary:active, .btn-2:active, .btn-quiet:active,
+    .btn-danger-wide:active, .donecard .shift-main:active, .donecard .addanother:active, .snackbar .undo:active{ transform:scale(.97); }
+
+    /* ---- hover only where a real pointer exists ----
+       On touch, iOS keeps :hover on whatever was last tapped, so it reads as a stuck state. */
+    @media (hover: hover) and (pointer: fine){
+      .gear:hover{ border-color:var(--line-2); color:var(--text); background:var(--card-2); }
+      .tab:not([aria-selected="true"]):hover{ color:var(--text); }
+      .pnav .chev:hover{ color:var(--text); background:var(--card-2); }
+      .pnav .mid:hover{ background:var(--card-2); }
+      .calgrid button.dcell:hover{ border-color:var(--line-2); background:var(--card-2); }
+      .calgrid button.dcell.ph:hover{ background:rgba(251,191,36,.2); }
+      .btn-primary:hover{ filter:brightness(1.05); }
+      .donecard .shift-main:hover{ background:var(--card-2); }
+      .donecard .addanother:hover{ color:var(--mint-2); }
+      .btn-2:hover{ border-color:var(--line-2); background:var(--card-2); }
+      .btn-2.danger:hover{ background:rgba(248,113,113,.12); }
+      .btn-quiet:hover{ color:var(--text); border-color:var(--line-2); }
+      .btn-danger-wide:hover{ background:rgba(248,113,113,.13); }
+      .era-actions .btn-quiet.danger:hover{ color:var(--red); background:rgba(248,113,113,.10); border-color:rgba(248,113,113,.5); }
+    }
+
+    /* ---- reduced motion: fewer and gentler, not zero ----
+       Keep the opacity/colour bridges, drop the movement. */
     @media (prefers-reduced-motion: reduce){
-      *,*::before,*::after{ animation-duration:.001ms !important; transition-duration:.001ms !important; scroll-behavior:auto !important; }
+      .sheet{ transform:none; opacity:0; transition:opacity .2s ease, visibility 0s linear .2s; }
+      .sheet.open{ opacity:1; transition:opacity .2s ease; }
+      .snackbar{ transform:translate(-50%,0); transition:opacity .2s ease; }
+      .donecard .is-new{ transform:none; transition:opacity .2s ease; }
+      .gear:active, .tab:active, .pnav .chev:active, .pnav .mid:active, .calgrid button.dcell:active,
+      .seg button:active, .eraseg button:active, .btn-primary:active, .btn-2:active, .btn-quiet:active,
+      .btn-danger-wide:active, .donecard .shift-main:active, .donecard .addanother:active, .snackbar .undo:active{ transform:none; opacity:.7; }
     }
   </style>
 </head>
@@ -1034,6 +1060,7 @@
   /* ====================================================================
      RENDER
      ==================================================================== */
+  let enterId = null;   /* shift id that gets the .is-new entrance on the next render (just added / Undo-restored) */
   function renderAll(){
     renderTabs();
     renderPeriodNav();
@@ -1041,6 +1068,7 @@
     renderCalendar();
     renderAddForm();
     renderBreakdown();
+    enterId = null;   /* consumed by this render; later renders (tab switches) stay instant */
   }
 
   function renderTabs(){
@@ -1208,6 +1236,8 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'shift-main';
+      const entering = s.id === enterId;
+      if (entering) btn.classList.add('is-new');
       btn.setAttribute('aria-label', 'Edit shift ' + DAY_LONG[d.getDay()] + ' ' + fmtDateLong(s.date) + ', ' + times);
       btn.innerHTML =
         '<span class="sd"><span class="dow">' + DAY_SHORT[d.getDay()] + '</span><span class="dom">' + MON_SHORT[d.getMonth()] + ' ' + d.getDate() + '</span></span>' +
@@ -1216,6 +1246,7 @@
         '<span class="pay"><span class="amt">' + money(c.gross) + '</span><span class="net">Net ' + money(c.net) + '</span></span>';
       btn.addEventListener('click', () => openEdit(s.id));
       card.appendChild(btn);
+      if (entering) setTimeout(() => btn.classList.remove('is-new'), 300);   /* hand the transition back to press feedback */
       /* Per-shift rate-band breakdown (e.g. base to 18:00, after 18:00) so the
          day's composition is visible without opening the edit sheet. */
       const rows = breakdownRowsHtml([s]);
@@ -1223,6 +1254,7 @@
         const bd = document.createElement('div');
         bd.className = 'daybreak';
         bd.innerHTML = rows;
+        if (entering) { bd.classList.add('is-new'); setTimeout(() => bd.classList.remove('is-new'), 300); }
         card.appendChild(bd);
       }
     }
@@ -1302,6 +1334,7 @@
     const s = sanitizeShift({ id: genId(), date: state.ui.selectedDate, start: draft.start, end: draft.end, phMode: draft.phMode });
     if (!s) { showSnack('Enter a valid date and times', null); return; }
     state.shifts.push(s);
+    enterId = s.id;       /* this one card animates in (see .is-new) */
     addAnother = false;   /* the form swaps back to the entered-shift card */
     saveState();
     renderAll();
@@ -1349,6 +1382,7 @@
     const cand = sanitizeShift(copy);
     if (!cand) { showSnack('Enter a valid date and times', null); return; }
     state.shifts.push(cand);
+    enterId = cand.id;
     saveState();
     closeSheet();
     renderAll();
@@ -1370,8 +1404,10 @@
     renderAll();
     const d = inputToDate(removed.date);
     showSnack(announce || `${DAY_SHORT[d.getDay()]}, ${MON_SHORT[d.getMonth()]} ${d.getDate()} shift deleted`, () => {
-      if (state.shifts.filter(x => sameShift(x, removed)).length < before)
+      if (state.shifts.filter(x => sameShift(x, removed)).length < before) {
         state.shifts.splice(Math.min(idx, state.shifts.length), 0, removed);   /* restore at original spot */
+        enterId = removed.id;
+      }
       saveState(); renderAll();
     });
   }
@@ -1419,18 +1455,20 @@
     }
   });
   $('scrim').addEventListener('click', () => closeSheet());
+  /* iOS Safari only applies :active on touch once a touchstart listener exists (press feedback above) */
+  document.addEventListener('touchstart', () => {}, { passive: true });
 
   /* Pull-down-to-dismiss on bottom sheets (touch/pen; mouse users have
      Close/Escape/scrim). Engages only when the sheet content is scrolled to
      the top and the finger moves down — inner scrolling is untouched. */
   function attachSheetDrag(sheet){
-    let y0 = null, dy = 0, dragging = false, pid = null, suppressUntil = 0;
+    let y0 = null, dy = 0, dragging = false, pid = null, suppressUntil = 0, t0 = 0;
     sheet.addEventListener('click', e => {
       if (performance.now() < suppressUntil) { e.stopPropagation(); e.preventDefault(); suppressUntil = 0; }
     }, true);
     sheet.addEventListener('pointerdown', e => {
       if (e.pointerType === 'mouse') return;
-      y0 = e.clientY; dy = 0; dragging = false; pid = e.pointerId;
+      y0 = e.clientY; dy = 0; dragging = false; pid = e.pointerId; t0 = performance.now();
     });
     sheet.addEventListener('pointermove', e => {
       if (y0 == null || e.pointerId !== pid) return;
@@ -1445,7 +1483,11 @@
       if (y0 == null || e.pointerId !== pid) return;
       if (dragging) {
         sheet.classList.remove('sheet-dragging');       /* transition back on */
-        const shouldClose = dy > 120;
+        /* Distance OR velocity: a quick flick closes even when it is short (Sonner's
+           rule — average speed over the gesture above 0.11 px/ms). The 40px floor
+           keeps a twitch from closing the sheet. */
+        const vel = dy / Math.max(1, performance.now() - t0);
+        const shouldClose = dy > 120 || (dy > 40 && vel > 0.11);
         sheet.style.transform = '';                      /* animate: back up, or (below) down and away */
         if (shouldClose) closeSheet();
         suppressUntil = performance.now() + 500;         /* a drag must not fire the button under the finger */
