@@ -69,7 +69,6 @@ Vanilla HTML / CSS / JavaScript · `localStorage` · Pointer Events · web fonts
 ```text
 app.html                # the entire app
 screenshots/            # README images
-docs/superpowers/specs/ # the design spec the UI was built from
 ```
 
 ## License
