@@ -74,4 +74,4 @@ docs/superpowers/specs/ # the design spec the UI was built from
 
 ## License
 
-[MIT](LICENSE) © 2026 Fumiya Claude
+Copyright (c) 2026 FMY74. All rights reserved. This repository is published for viewing and evaluation only. No permission is granted to copy, modify, distribute, sublicense or use this code or its documentation, in whole or in part, without prior written permission. See [LICENSE](LICENSE).
